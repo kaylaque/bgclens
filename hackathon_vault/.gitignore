@@ -1,0 +1,28 @@
+# Obsidian binary
+Obsidian.AppImage
+
+# Obsidian internal config
+.obsidian/
+
+# Large binary attachments (PDFs, images)
+_attachments/
+
+# macOS noise
+.DS_Store
+
+# Personal second brain content (keep structure, not content)
+wiki/**/*.md
+raw/**/*.md
+Clippings/**/*.md
+journal/**/*.md
+
+# Personal metadata files
+index.md
+log.md
+CLAUDE.md
+
+# Keep .gitkeep files (preserve empty directories)
+!**/.gitkeep
+
+# Setup metadata
+.claude-whoami
