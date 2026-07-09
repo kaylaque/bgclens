@@ -1,0 +1,9 @@
+genome_id,terpene,nrps,pks,alkaloid,RiPP
+genome_001,3,1,0,0,2
+genome_002,1,2,1,0,1
+genome_003,0,0,2,1,0
+genome_004,2,1,1,0,2
+genome_005,1,0,0,2,1
+genome_006,3,2,0,0,0
+genome_007,0,1,2,1,1
+genome_008,2,0,1,0,2

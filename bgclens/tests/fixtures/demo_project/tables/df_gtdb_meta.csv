@@ -1,0 +1,9 @@
+genome_id,domain,phylum,class,order,family,genus,species,clade
+genome_001,Bacteria,Actinobacteriota,Actinomycetia,Mycobacteriales,Streptomycetaceae,Streptomyces,sp1,A
+genome_002,Bacteria,Actinobacteriota,Actinomycetia,Mycobacteriales,Streptomycetaceae,Streptomyces,sp2,A
+genome_003,Bacteria,Actinobacteriota,Actinomycetia,Mycobacteriales,Streptomycetaceae,Streptomyces,sp3,A
+genome_004,Bacteria,Actinobacteriota,Actinomycetia,Mycobacteriales,Streptomycetaceae,Streptomyces,sp4,A
+genome_005,Bacteria,Actinobacteriota,Actinomycetia,Pseudonocardiales,Pseudonocardiaceae,Saccharopolyspora,sp5,B
+genome_006,Bacteria,Actinobacteriota,Actinomycetia,Pseudonocardiales,Pseudonocardiaceae,Saccharopolyspora,sp6,B
+genome_007,Bacteria,Actinobacteriota,Actinomycetia,Pseudonocardiales,Pseudonocardiaceae,Saccharopolyspora,sp7,B
+genome_008,Bacteria,Actinobacteriota,Actinomycetia,Pseudonocardiales,Pseudonocardiaceae,Saccharopolyspora,sp8,B

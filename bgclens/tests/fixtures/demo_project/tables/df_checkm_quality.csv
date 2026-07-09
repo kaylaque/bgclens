@@ -1,0 +1,9 @@
+genome_id,completeness,contamination
+genome_001,98.2,0.3
+genome_002,97.5,0.1
+genome_003,96.8,0.5
+genome_004,99.1,0.2
+genome_005,95.3,0.8
+genome_006,97.9,0.4
+genome_007,98.7,0.1
+genome_008,96.2,0.6
