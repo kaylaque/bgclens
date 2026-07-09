@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BGCLens — Post-Processing for BGCFlow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+
+  header { background: #1e3a5f; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header span { opacity: 0.7; font-size: 0.9rem; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+
+  .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card h2 { font-size: 1.1rem; font-weight: 600; color: #1e3a5f; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .step-num { background: #2563eb; color: white; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+
+  label { display: block; font-size: 0.875rem; font-weight: 500; color: #475569; margin-bottom: 0.4rem; }
+  input[type="text"], textarea { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; transition: border-color 0.15s; }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  button { padding: 0.6rem 1.4rem; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+  .btn-secondary { background: #f1f5f9; color: #475569; }
+  .btn-download { background: #16a34a; color: white; }
+  .btn-download:hover { background: #15803d; }
+
+  .badge { display: inline-flex; align-items: center; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .badge-safe { background: #dcfce7; color: #15803d; }
+  .badge-heavy { background: #fef9c3; color: #a16207; }
+  .badge-fail { background: #fee2e2; color: #b91c1c; }
+  .badge-lit-strong { background: #dbeafe; color: #1d4ed8; }
+  .badge-lit-moderate { background: #ede9fe; color: #6d28d9; }
+  .badge-lit-none { background: #f1f5f9; color: #64748b; }
+
+  .manifest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .manifest-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; }
+  .manifest-item .label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.2rem; }
+  .manifest-item .value { font-size: 1.1rem; font-weight: 700; color: #1e3a5f; }
+
+  .intent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+  .intent-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.9rem 1rem; cursor: pointer; transition: all 0.15s; }
+  .intent-card:hover { border-color: #93c5fd; background: #eff6ff; }
+  .intent-card.selected { border-color: #2563eb; background: #eff6ff; }
+  .intent-card input { display: none; }
+  .intent-card .intent-label { font-weight: 600; font-size: 0.9rem; color: #1e3a5f; }
+  .intent-card .intent-desc { font-size: 0.78rem; color: #64748b; margin-top: 0.2rem; }
+
+  .method-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.15s; }
+  .method-card:hover { border-color: #93c5fd; }
+  .method-card.selected { border-color: #2563eb; background: #eff6ff; }
+  .method-card.recommended { border-color: #16a34a; }
+  .method-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .method-name { font-weight: 600; font-size: 0.95rem; }
+  .rec-tag { background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+  .warning-list { margin-top: 0.5rem; }
+  .warning-item { font-size: 0.78rem; color: #92400e; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 0.3rem 0.6rem; margin-top: 0.3rem; border-radius: 0 4px 4px 0; }
+
+  .result-section { margin-top: 1rem; }
+  .figure-container { text-align: center; margin: 1rem 0; }
+  .figure-container img { max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .interpretation { line-height: 1.7; font-size: 0.9rem; }
+  .interpretation h2 { font-size: 1rem; font-weight: 700; color: #1e3a5f; margin: 1rem 0 0.4rem; }
+  .interpretation p { margin-bottom: 0.6rem; }
+  .interpretation ul { padding-left: 1.4rem; margin-bottom: 0.6rem; }
+  .interpretation li { margin-bottom: 0.3rem; }
+  .interpretation strong { font-weight: 700; }
+  .download-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+
+  .alert { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-top: 0.75rem; }
+  .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+  .alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+  .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+  .mt { margin-top: 1rem; }
+  .flex-gap { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+  .llm-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; background: #f3e8ff; color: #7c3aed; border-radius: 999px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BGCLens</h1>
+    <span>Post-processing &amp; interpretation for BGCFlow</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Ingest -->
+  <div class="card" id="step-ingest">
+    <h2><span class="step-num">1</span> Load BGCFlow Project</h2>
+    <label for="project-path">BGCFlow project directory path</label>
+    <div class="flex-gap mt" style="margin-top:0.5rem">
+      <input type="text" id="project-path" placeholder="/path/to/bgcflow/data/processed/my_project" style="flex:1">
+      <button class="btn-primary" id="btn-load" onclick="loadProject()">Load Project</button>
+    </div>
+    <div id="ingest-error" class="hidden"></div>
+    <div id="manifest-panel" class="hidden">
+      <div class="manifest-grid" id="manifest-grid"></div>
+    </div>
+  </div>
+
+  <!-- Step 2: Intent + Topic -->
+  <div class="card hidden" id="step-intent">
+    <h2><span class="step-num">2</span> What do you want to analyse?</h2>
+    <div class="intent-grid" id="intent-grid"></div>
+    <label for="topic-input" style="margin-top:1rem">Describe your research question (used to find relevant literature)</label>
+    <textarea id="topic-input" rows="2" placeholder="e.g. Which BGC classes are enriched in the Streptomyces clade compared to Saccharopolyspora?"></textarea>
+    <div class="mt">
+      <button class="btn-primary" id="btn-recommend" onclick="getRecommendations()">Get Method Recommendations</button>
+    </div>
+    <div id="intent-error" class="hidden"></div>
+  </div>
+
+  <!-- Step 3: Method selection -->
+  <div class="card hidden" id="step-methods">
+    <h2><span class="step-num">3</span> Choose Analysis Method</h2>
+    <div id="method-list"></div>
+    <div class="mt">
+      <button class="btn-primary" id="btn-run" onclick="runAnalysis()">Run Analysis</button>
+    </div>
+    <div id="method-error" class="hidden"></div>
+  </div>
+
+  <!-- Step 4: Result -->
+  <div class="card hidden" id="step-result">
+    <h2><span class="step-num">4</span> Result</h2>
+    <div id="result-content"></div>
+  </div>
+
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let state = {
+  projectPath: null,
+  manifest: null,
+  intents: [],
+  selectedIntent: null,
+  recommendations: [],
+  selectedMethod: null,
+};
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  const json = await r.json();
+  if (!r.ok) throw new Error(json.detail || 'API error');
+  return json;
+}
+
+// ── Step 1: Ingest ───────────────────────────────────────────────────────────
+async function loadProject() {
+  const path = document.getElementById('project-path').value.trim();
+  if (!path) return showError('ingest-error', 'Please enter a project path.');
+
+  const btn = document.getElementById('btn-load');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Loading&hellip;';
+  hideError('ingest-error');
+
+  try {
+    const data = await api('POST', '/api/open', { path });
+    state.projectPath = path;
+    state.manifest = data;
+    showManifest(data);
+    await loadIntents();
+    show('step-intent');
+  } catch(e) {
+    showError('ingest-error', e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Load Project';
+  }
+}
+
+function showManifest(m) {
+  const grid = document.getElementById('manifest-grid');
+  grid.innerHTML = [
+    ['Project', m.project_name],
+    ['Genomes', m.genome_count],
+    ['GCFs', m.gcf_count],
+    ['Pipelines', m.available_pipelines.join(', ') || 'none'],
+  ].map(([l, v]) => `<div class="manifest-item"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
+  show('manifest-panel');
+}
+
+// ── Step 2: Intents ──────────────────────────────────────────────────────────
+async function loadIntents() {
+  const data = await api('GET', '/api/intents');
+  state.intents = data.intents;
+  const grid = document.getElementById('intent-grid');
+  grid.innerHTML = data.intents.map(i => `
+    <label class="intent-card" onclick="selectIntent('${i.value}', this)">
+      <input type="radio" name="intent" value="${i.value}">
+      <div class="intent-label">${i.label}</div>
+      <div class="intent-desc">${i.description}</div>
+    </label>`).join('');
+}
+
+function selectIntent(value, el) {
+  document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.selectedIntent = value;
+}
+
+async function getRecommendations() {
+  if (!state.selectedIntent) return showError('intent-error', 'Please choose an analysis intent.');
+  const topic = document.getElementById('topic-input').value.trim() || 'BGC analysis';
+
+  const btn = document.getElementById('btn-recommend');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Getting recommendations&hellip;';
+  hideError('intent-error');
+
+  try {
+    const data = await api('POST', '/api/recommend', {
+      path: state.projectPath,
+      intent: state.selectedIntent,
+      topic,
+      use_literature: false,
+    });
+
+    if (!data.valid) {
+      showError('intent-error', data.suggestion || 'Intent not compatible with available data.');
+      return;
+    }
+    state.recommendations = data.recommendations;
+    state.selectedMethod = data.recommendations.find(r => r.is_recommended)?.method_id || data.recommendations[0]?.method_id;
+    renderMethods(data.recommendations);
+    show('step-methods');
+  } catch(e) {
+    showError('intent-error', e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Get Method Recommendations';
+  }
+}
+
+// ── Step 3: Methods ──────────────────────────────────────────────────────────
+function renderMethods(recs) {
+  const list = document.getElementById('method-list');
+  list.innerHTML = recs.map(r => {
+    const costClass = {'Safe':'badge-safe','Heavy':'badge-heavy','Likely-to-fail':'badge-fail'}[r.cost_class] || 'badge-safe';
+    const litClass = {'strong':'badge-lit-strong','moderate':'badge-lit-moderate','weak':'badge-lit-none'}[r.literature_support] || 'badge-lit-none';
+    const litLabel = r.literature_support === 'unknown' ? '' : `Literature: ${r.literature_support}`;
+    const warnings = r.assumption_warnings.map(w => `<div class="warning-item">&#9888; ${w}</div>`).join('');
+    const recTag = r.is_recommended ? '<span class="rec-tag">&#10003; Recommended</span>' : '';
+    return `
+      <div class="method-card ${r.is_recommended ? 'recommended' : ''} ${state.selectedMethod === r.method_id ? 'selected' : ''}"
+           id="mcard-${r.method_id}" onclick="selectMethod('${r.method_id}')">
+        <div class="method-header">
+          <span class="method-name">${r.method_name}</span>
+          ${recTag}
+          <span class="badge ${costClass}">${r.cost_class}</span>
+          ${litLabel ? `<span class="badge ${litClass}">${litLabel}</span>` : ''}
+        </div>
+        <div style="font-size:0.78rem;color:#64748b;margin-top:0.3rem">${r.cost_reason}</div>
+        <div class="warning-list">${warnings}</div>
+      </div>`;
+  }).join('');
+}
+
+function selectMethod(methodId) {
+  state.selectedMethod = methodId;
+  document.querySelectorAll('.method-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('mcard-' + methodId);
+  if (card) card.classList.add('selected');
+}
+
+// ── Step 4: Run ──────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!state.selectedMethod) return showError('method-error', 'Please select a method.');
+
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Running analysis&hellip;';
+  hideError('method-error');
+
+  try {
+    const data = await api('POST', '/api/run', {
+      path: state.projectPath,
+      method_id: state.selectedMethod,
+      params: {},
+      use_llm: true,
+    });
+    renderResult(data);
+    show('step-result');
+    document.getElementById('step-result').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) {
+    showError('method-error', e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Run Analysis';
+  }
+}
+
+function renderResult(data) {
+  const warnings = (data.assumption_warnings || [])
+    .map(w => `<div class="alert alert-warn">&#9888; ${w}</div>`).join('');
+
+  const llmBadge = data.llm_used
+    ? '<span class="llm-badge">&#10024; Interpretation enhanced by LLM</span>'
+    : '';
+
+  const figureHtml = data.figure_svg_b64
+    ? `<div class="figure-container">
+         <img src="data:image/svg+xml;base64,${data.figure_svg_b64}" alt="Analysis figure">
+       </div>`
+    : '<div class="alert alert-info">Figure not available for this method.</div>';
+
+  const interpretation = renderMarkdown(data.interpretation || '');
+
+  const pngHref = data.figure_png_b64
+    ? `data:image/png;base64,${data.figure_png_b64}`
+    : null;
+  const svgHref = data.figure_svg_b64
+    ? `data:image/svg+xml;base64,${data.figure_svg_b64}`
+    : null;
+
+  const downloadBtns = [
+    pngHref ? `<a href="${pngHref}" download="bgclens_figure.png"><button class="btn-download">&#11015; PNG</button></a>` : '',
+    svgHref ? `<a href="${svgHref}" download="bgclens_figure.svg"><button class="btn-download" style="background:#0369a1">&#11015; SVG</button></a>` : '',
+  ].join('');
+
+  document.getElementById('result-content').innerHTML = `
+    ${warnings}
+    ${figureHtml}
+    <div class="download-row">${downloadBtns}</div>
+    <div class="result-section">
+      <div class="flex-gap" style="margin-bottom:0.75rem">
+        <strong>Interpretation</strong> ${llmBadge}
+      </div>
+      <div class="interpretation">${interpretation}</div>
+    </div>
+  `;
+}
+
+// ── Simple Markdown renderer ─────────────────────────────────────────────────
+function renderMarkdown(md) {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/((<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hup])/gm, '')
+    .replace(/\n/g, '<br>')
+    .replace(/^(.+)$/gm, (_, p) => p.startsWith('<') ? p : `<p>${p}</p>`);
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.className = 'alert alert-error';
+  el.textContent = '✖ ' + msg;
+  el.classList.remove('hidden');
+}
+function hideError(id) { document.getElementById(id).classList.add('hidden'); }
+</script>
+
+</body>
+</html>
