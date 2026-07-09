@@ -142,23 +142,71 @@ class TestWalkingSkeleton:
         assert restored.inputs_hash == record.inputs_hash
         assert restored.run_spec["method_id"] == "pcoa"
 
-    def test_11_interpret_with_llm(self):
-        """interpret() with LLM enabled calls the real LLM endpoint if configured."""
+    def _pcoa_result(self):
         from bgclens.core.api import open_project, run
+        return run(open_project(DEMO_PROJECT), "pcoa", {"n_components": 2})
+
+    def test_11_interpret_with_llm(self):
+        """When the LLM is configured, interpret() must actually reach the endpoint.
+
+        rephrase() swallows every exception and returns template_text unchanged,
+        so a missing `openai` package, a bad key, or a dead endpoint all look
+        identical to success unless llm_used is asserted. Checking only the
+        length of final_text passes in all of those cases.
+        """
         from bgclens.interpret import interpret
         from bgclens.core.config import get_settings
 
         settings = get_settings()
-        project = open_project(DEMO_PROJECT)
-        result = run(project, "pcoa", {"n_components": 2})
+        if not (settings.llm.enabled and settings.llm.api_key):
+            pytest.skip("LLM not configured (set BGCLENS_LLM_* in .env)")
 
-        # Try with LLM — if not configured it should gracefully fall back
-        output = interpret(result, use_llm=True)
-        assert "final_text" in output
-        assert len(output["final_text"]) > 50
-        # If LLM was configured and worked, llm_used should be True
-        if settings.llm.enabled and settings.llm.api_key:
-            # LLM was attempted - result should be non-empty regardless
-            assert len(output["final_text"]) > 100
-        # Either way, the text must contain key sections
-        assert "Method" in output["final_text"] or "method" in output["final_text"].lower()
+        output = interpret(self._pcoa_result(), use_llm=True)
+
+        assert output["llm_used"] is True, (
+            "LLM is configured but interpret() silently fell back to the "
+            "template. Check that `openai` is installed and the endpoint is "
+            "reachable."
+        )
+        assert output["final_text"] != output["template_text"]
+        assert "Method" in output["final_text"]
+
+    def test_11b_interpret_falls_back_when_llm_unconfigured(self, monkeypatch):
+        """No API key -> template text, llm_used False, no exception."""
+        import bgclens.core.config as config
+        from bgclens.core.config import BGCLensSettings, LLMSettings
+        from bgclens.interpret import interpret
+
+        disabled = BGCLensSettings(llm=LLMSettings(enabled=False, api_key=""))
+        monkeypatch.setattr(config, "get_settings", lambda: disabled)
+
+        output = interpret(self._pcoa_result(), use_llm=True)
+        assert output["llm_used"] is False
+        assert output["final_text"] == output["template_text"]
+
+    def test_11c_interpret_degrades_when_endpoint_fails(self, monkeypatch):
+        """A failing endpoint must degrade to template text, not raise."""
+        import sys
+        from types import ModuleType
+        import bgclens.core.config as config
+        from bgclens.core.config import BGCLensSettings, LLMSettings
+        from bgclens.interpret import interpret
+
+        enabled = BGCLensSettings(
+            llm=LLMSettings(enabled=True, api_key="sk-test", model="m")
+        )
+        monkeypatch.setattr(config, "get_settings", lambda: enabled)
+
+        # Inject a stand-in `openai` whose client constructor blows up, so this
+        # test never depends on the real package being installed or reachable.
+        def _boom(*args, **kwargs):
+            raise RuntimeError("endpoint unreachable")
+
+        fake = ModuleType("openai")
+        fake.OpenAI = _boom
+        monkeypatch.setitem(sys.modules, "openai", fake)
+
+        output = interpret(self._pcoa_result(), use_llm=True)
+        assert output["llm_used"] is False
+        assert output["final_text"] == output["template_text"]
+        assert "Method" in output["final_text"]
