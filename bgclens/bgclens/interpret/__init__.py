@@ -3,6 +3,8 @@ from bgclens.interpret.facts import InterpretationFacts, extract_facts
 from bgclens.interpret.templates import render_template
 from bgclens.interpret.guard import validate as guard_validate
 from bgclens.interpret.llm import rephrase
+from bgclens.interpret.goals import HARD_GOALS, SOFT_GOALS
+from bgclens.interpret.judge import judge_goals
 
 
 def interpret(
@@ -39,4 +41,7 @@ __all__ = [
     "guard_validate",
     "rephrase",
     "interpret",
+    "HARD_GOALS",
+    "SOFT_GOALS",
+    "judge_goals",
 ]

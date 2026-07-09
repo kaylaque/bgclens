@@ -4,10 +4,12 @@ from bgclens.model import DatasetHandle, ProjectManifest
 
 # Known BGCFlow output file patterns, keyed by pipeline name
 _PIPELINE_MARKERS: dict[str, list[str]] = {
-    "antismash": ["tables/df_antismash_7.0.1_summary.csv"],
+    "antismash": ["tables/df_antismash_*_summary.csv"],
     "bigscape": [
         "bigscape/network_files",
         "tables/df_bigscape_cluster_summary.csv",
+        # BiG-SCAPE 2, as emitted by BGCFlow
+        "bigscape2/*/*df_family_presence_*.csv",
     ],
     "bigslice": ["tables/df_bigslice_query_network_annotated.csv"],
     "gecco": ["tables/df_gecco_features.csv"],
@@ -19,6 +21,13 @@ _PIPELINE_MARKERS: dict[str, list[str]] = {
 }
 
 _DUCKDB_NAMES = ["dbt_bgcflow.duckdb", "bgcflow.duckdb"]
+
+
+def _marker_present(root: Path, marker: str) -> bool:
+    """Check a marker path, which may contain a glob for a tool version."""
+    if "*" in marker:
+        return any(root.glob(marker))
+    return (root / marker).exists()
 
 
 def detect_project(path: Path) -> ProjectManifest:
@@ -33,7 +42,7 @@ def detect_project(path: Path) -> ProjectManifest:
     available: set[str] = set()
     for pipeline, markers in _PIPELINE_MARKERS.items():
         for marker in markers:
-            if (path / marker).exists():
+            if _marker_present(path, marker):
                 available.add(pipeline)
                 break
 
