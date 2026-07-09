@@ -37,7 +37,9 @@ def run_pcoa(inputs: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     eigenvectors = eigenvectors[:, order]
 
     pos_mask = eigenvalues > 1e-10
-    k = min(n_comp, pos_mask.sum())
+    # pos_mask.sum() is a np.int64; min() would propagate it into the result
+    # dict, where FastAPI's JSON encoder cannot serialize it.
+    k = int(min(n_comp, pos_mask.sum()))
     coords = eigenvectors[:, :k] * np.sqrt(np.maximum(eigenvalues[:k], 0))
 
     total_var = eigenvalues[pos_mask].sum()
