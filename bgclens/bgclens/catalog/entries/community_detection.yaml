@@ -1,0 +1,16 @@
+id: louvain_community
+name: Louvain Community Detection (GCF network)
+intents: [network_structure]
+requires:
+  network: network_edge_list
+params:
+  resolution: {default: 1.0}
+  seed: {default: 42}
+assumptions:
+  - min_nodes_4
+  - network_connected_components_warning
+cost_model: bgclens.catalog.methods.community:cost
+impl: bgclens.catalog.methods.community:run
+citation:
+  doi: "10.1088/1742-5468/2008/10/P10008"
+  note: "Blondel et al. 2008 Louvain"

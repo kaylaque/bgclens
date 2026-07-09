@@ -1,0 +1,18 @@
+id: fisher_enrichment
+name: Fisher's Exact Test (BGC class enrichment)
+intents: [enrichment]
+requires:
+  counts: feature_count_table
+  grouping_col: str
+params:
+  grouping_col: {default: null, description: "MetadataTable column to split genomes into two groups"}
+  correction: {default: bh, choices: [bh, bonferroni, none]}
+  alpha: {default: 0.05}
+assumptions:
+  - two_groups_in_metadata
+  - min_group_n_2
+cost_model: bgclens.catalog.methods.enrichment:cost
+impl: bgclens.catalog.methods.enrichment:run
+citation:
+  doi: "10.1017/CBO9780511814686"
+  note: "Fisher 1922 / Benjamini & Hochberg 1995"

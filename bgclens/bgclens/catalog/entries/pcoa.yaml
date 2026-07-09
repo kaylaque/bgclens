@@ -1,0 +1,17 @@
+id: pcoa
+name: Principal Coordinates Analysis (PCoA / PCA of distances)
+intents: [ordination]
+requires:
+  presence_absence: presence_absence_matrix
+params:
+  metric: {default: braycurtis, choices: [braycurtis, jaccard, euclidean]}
+  n_components: {default: 3}
+  subsample_n: {default: null, description: "Max genomes before subsampling (null=no limit)"}
+assumptions:
+  - min_genomes_5
+  - min_gcfs_2
+cost_model: bgclens.catalog.methods.ordination:pcoa_cost
+impl: bgclens.catalog.methods.ordination:run_pcoa
+citation:
+  doi: "10.2307/2528823"
+  note: "Gower 1966 PCoA"

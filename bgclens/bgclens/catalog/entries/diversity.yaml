@@ -1,0 +1,16 @@
+id: alpha_diversity
+name: Alpha Diversity (Shannon, Simpson, rarefaction)
+intents: [diversity]
+requires:
+  counts: feature_count_table
+params:
+  metrics: {default: [shannon, simpson], description: "List of diversity metrics"}
+  rarefaction_depth: {default: null, description: "Reads to rarefy to (null=min observed)"}
+assumptions:
+  - min_genomes_3
+  - non_negative_counts
+cost_model: bgclens.catalog.methods.diversity:cost
+impl: bgclens.catalog.methods.diversity:run
+citation:
+  doi: "10.2307/1934352"
+  note: "Shannon 1948; Simpson 1949"

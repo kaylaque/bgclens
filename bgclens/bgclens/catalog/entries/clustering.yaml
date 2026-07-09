@@ -1,0 +1,16 @@
+id: hierarchical_clustering
+name: Hierarchical Clustering (Ward / complete linkage)
+intents: [clustering]
+requires:
+  presence_absence: presence_absence_matrix
+params:
+  metric: {default: braycurtis}
+  linkage: {default: ward, choices: [ward, complete, average, single]}
+  n_clusters: {default: null, description: "Cut to this many clusters; null=return dendrogram"}
+assumptions:
+  - min_genomes_4
+cost_model: bgclens.catalog.methods.clustering:cost
+impl: bgclens.catalog.methods.clustering:run
+citation:
+  doi: "10.2307/2406116"
+  note: "Ward 1963 minimum variance clustering"

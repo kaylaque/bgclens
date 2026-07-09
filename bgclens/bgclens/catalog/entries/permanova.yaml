@@ -1,0 +1,19 @@
+id: permanova
+name: PERMANOVA (Permutational ANOVA of distances)
+intents: [comparison]
+requires:
+  presence_absence: presence_absence_matrix
+  grouping_col: str
+params:
+  metric: {default: braycurtis}
+  permutations: {default: 999}
+  correction: {default: bh}
+assumptions:
+  - two_groups_in_metadata
+  - min_group_n_3
+  - group_balance_warning
+cost_model: bgclens.catalog.methods.permanova:cost
+impl: bgclens.catalog.methods.permanova:run
+citation:
+  doi: "10.1111/j.1442-9993.2001.01070.pp.x"
+  note: "Anderson 2001 PERMANOVA"
