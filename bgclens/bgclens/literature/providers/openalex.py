@@ -1,5 +1,6 @@
 """OpenAlex literature provider."""
 import time
+from datetime import datetime
 from typing import Any
 import httpx
 
@@ -12,7 +13,7 @@ _RATE_LIMIT_SLEEP = 0.12   # ~8 req/s polite limit
 _TIMEOUT = 10.0
 
 
-def _search_works(query: str, filter_str: str = "", per_page: int = 10) -> list[dict]:
+def _search_works(query: str, filter_str: str = "", per_page: int = 10, window_years: int = 10) -> list[dict]:
     """Call OpenAlex /works endpoint. Returns list of work dicts."""
     params: dict[str, Any] = {
         "search": query,
@@ -21,6 +22,9 @@ def _search_works(query: str, filter_str: str = "", per_page: int = 10) -> list[
     }
     if filter_str:
         params["filter"] = filter_str
+    elif window_years:
+        from_year = datetime.now().year - window_years
+        params["filter"] = f"publication_year:>{from_year}"
     try:
         r = httpx.get(f"{_BASE}/works", params=params, headers=_HEADERS, timeout=_TIMEOUT)
         r.raise_for_status()
@@ -34,7 +38,7 @@ def _abstract_from_inverted(inverted: dict | None) -> str:
         return ""
     pairs = [(word, pos) for word, positions in inverted.items() for pos in positions]
     pairs.sort(key=lambda x: x[1])
-    return " ".join(w for w, _ in pairs[:80])
+    return " ".join(w for w, _ in pairs[:200])
 
 
 def _to_citation(work: dict) -> Citation:
@@ -54,7 +58,7 @@ def _to_citation(work: dict) -> Citation:
 
 def _cooccurrence_query(method_term: str, topic_terms: list[str]) -> str:
     """Build a query string requiring both method and topic."""
-    topic_part = " OR ".join(f'"{t}"' for t in topic_terms[:3])
+    topic_part = " OR ".join(f'"{t}"' for t in topic_terms[:5])
     return f'"{method_term}" AND ({topic_part})'
 
 
@@ -79,7 +83,7 @@ class OpenAlexProvider:
         max_citations: int = 5,
     ) -> list[MethodLiteratureSupport]:
         results = []
-        for method_id, method_term in zip(method_terms, method_terms):
+        for method_term in method_terms:
             key = _cache.cache_key([method_term], topic_terms, window_years)
             cached = _cache.get_cached(key)
             if cached is not None:
@@ -88,7 +92,7 @@ class OpenAlexProvider:
 
             time.sleep(_RATE_LIMIT_SLEEP)
             query = _cooccurrence_query(method_term, topic_terms)
-            works = _search_works(query, per_page=max_citations + 2)
+            works = _search_works(query, per_page=max_citations + 2, window_years=window_years)
 
             # Validate co-occurrence: work must mention method term AND a topic term
             validated = []
@@ -110,6 +114,6 @@ class OpenAlexProvider:
                 citations=validated,
                 note="" if validated else "No co-occurring works found in OpenAlex",
             )
-            _cache.set_cached(key, support.__dict__)
+            _cache.set_cached(key, support.__dict__, ttl_days=7)
             results.append(support)
         return results

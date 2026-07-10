@@ -108,3 +108,97 @@ def test_provider_factory_env_var(monkeypatch):
     monkeypatch.setenv("BGCLENS_LITERATURE_PROVIDER", "europepmc")
     p = get_provider()
     assert isinstance(p, EuropePMCProvider)
+
+
+# ---------------------------------------------------------------------------
+# New tests for Task 4 fixes
+# ---------------------------------------------------------------------------
+
+def test_openalex_abstract_cap_200():
+    """_abstract_from_inverted should return at most 200 words."""
+    from bgclens.literature.providers.openalex import _abstract_from_inverted
+
+    # Build an inverted index with 250 words
+    inverted = {f"word{i}": [i] for i in range(250)}
+    result = _abstract_from_inverted(inverted)
+    words = result.split()
+    assert len(words) <= 200
+
+
+def test_cooccurrence_query_uses_5_topic_terms():
+    """_cooccurrence_query should include up to 5 topic terms, not 3."""
+    from bgclens.literature.providers.openalex import _cooccurrence_query
+
+    topic_terms = ["a", "b", "c", "d", "e", "f"]
+    query = _cooccurrence_query("PCoA", topic_terms)
+
+    # All of a-e should appear in the query
+    for term in ["a", "b", "c", "d", "e"]:
+        assert f'"{term}"' in query, f'Expected term "{term}" in query: {query}'
+
+    # f (6th term) should NOT appear
+    assert '"f"' not in query, f'Unexpected term "f" found in query: {query}'
+
+
+def test_merge_supports_takes_max_level():
+    """merge_supports should take the better (max) support level."""
+    from bgclens.literature.ranker import merge_supports
+
+    moderate_support = [
+        MethodLiteratureSupport(
+            method_id="pcoa",
+            support_level="moderate",
+            work_count=3,
+            citations=[],
+        )
+    ]
+    strong_support = [
+        MethodLiteratureSupport(
+            method_id="pcoa",
+            support_level="strong",
+            work_count=10,
+            citations=[],
+        )
+    ]
+
+    result = merge_supports([moderate_support, strong_support], ["pcoa"])
+    assert len(result) == 1
+    assert result[0].support_level == "strong"
+
+
+def test_merge_supports_deduplicates_by_doi():
+    """merge_supports should deduplicate citations with the same DOI."""
+    from bgclens.literature.provider import Citation
+    from bgclens.literature.ranker import merge_supports
+
+    shared_doi = "10.1234/test"
+    cite = Citation(title="Shared paper", authors=["Author A"], year=2022, doi=shared_doi, openalex_id=None)
+
+    supports_a = [
+        MethodLiteratureSupport(
+            method_id="pcoa",
+            support_level="moderate",
+            work_count=1,
+            citations=[cite],
+        )
+    ]
+    supports_b = [
+        MethodLiteratureSupport(
+            method_id="pcoa",
+            support_level="weak",
+            work_count=1,
+            citations=[cite],
+        )
+    ]
+
+    result = merge_supports([supports_a, supports_b], ["pcoa"])
+    assert len(result) == 1
+    assert len(result[0].citations) == 1
+
+
+def test_offline_fallback_provider_name():
+    """_offline_fallback should return LiteratureRanking with provider='offline'."""
+    from bgclens.literature.ranker import _offline_fallback
+
+    ranking = _offline_fallback(["pcoa"], "some topic")
+    assert ranking.provider == "offline"
