@@ -170,3 +170,16 @@ def test_extract_paper_partial_valid_spans():
     assert result.method_mentions[0].method_term == "PCoA"
     assert result.method_mentions[0].evidence_span == "PCoA to visualise beta-diversity"
     assert result.method_mentions[0].confidence == pytest.approx(0.95)
+
+
+def test_extract_paper_llm_returns_non_dict_json():
+    """When LLM returns valid JSON that is not a dict (e.g. array), returns failed=True without raising."""
+    with (
+        patch("bgclens.literature.extract.get_settings", return_value=_enabled_settings()),
+        patch("bgclens.literature.extract._build_client", return_value=MagicMock()),
+        patch("bgclens.literature.extract.call_chat", return_value="[]"),
+    ):
+        result = extract_paper(ABSTRACT, ["PCoA"])
+
+    assert result.failed is True
+    assert "unexpected response shape" in result.note

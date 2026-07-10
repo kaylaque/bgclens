@@ -122,6 +122,13 @@ def extract_paper(
             note=f"LLM error: JSON parse failed — {exc}",
         )
 
+    if not isinstance(data, dict):
+        return PaperExtract(
+            source_text=abstract_text,
+            failed=True,
+            note="LLM error: unexpected response shape",
+        )
+
     # Build typed result
     method_mentions: list[FieldEvidence] = []
     for item in data.get("method_mentions", []):
@@ -130,13 +137,13 @@ def extract_paper(
                 FieldEvidence(
                     method_term=str(item.get("method_term", "")),
                     evidence_span=str(item.get("evidence_span", "")),
-                    confidence=float(item.get("confidence", 0.0)),
+                    confidence=max(0.0, min(1.0, float(item.get("confidence", 0.0)))),
                 )
             )
         except (TypeError, ValueError):
             continue  # skip malformed entries
 
-    organism_terms: list[str] = [str(t) for t in data.get("organism_terms", [])]
+    organism_terms: list[str] = [str(t) for t in (data.get("organism_terms") or [])]
 
     extract = PaperExtract(
         source_text=abstract_text,
