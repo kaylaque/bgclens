@@ -147,14 +147,15 @@ def recommend(
         # Literature ranking (optional, graceful fallback)
         if use_literature:
             try:
-                from bgclens.literature.openalex import OpenAlexProvider
+                from bgclens.literature.providers import get_provider
                 from bgclens.literature.ranker import rank_methods
                 method_names = {r.method_id: r.method_name for r in recommendations}
+                provider = get_provider()
                 ranking = rank_methods(
                     method_ids=[r.method_id for r in recommendations],
                     method_display_names=method_names,
                     topic=request.topic,
-                    provider=OpenAlexProvider(),
+                    provider=provider,
                 )
                 rank_map = {s.method_id: s for s in ranking.method_rankings}
                 for rec in recommendations:

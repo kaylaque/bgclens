@@ -68,3 +68,43 @@ def test_support_level_ordering():
     from bgclens.literature.ranker import _LEVEL_ORDER
     assert _LEVEL_ORDER["strong"] < _LEVEL_ORDER["weak"]
     assert _LEVEL_ORDER["weak"] < _LEVEL_ORDER["none"]
+
+
+# ---------------------------------------------------------------------------
+# Provider factory tests (all offline — no HTTP calls)
+# ---------------------------------------------------------------------------
+
+def test_provider_factory_openalex():
+    from bgclens.literature.providers import get_provider
+    from bgclens.literature.providers.openalex import OpenAlexProvider
+    p = get_provider("openalex")
+    assert isinstance(p, OpenAlexProvider)
+
+
+def test_provider_factory_europepmc():
+    from bgclens.literature.providers import get_provider
+    from bgclens.literature.providers.europepmc import EuropePMCProvider
+    p = get_provider("europepmc")
+    assert isinstance(p, EuropePMCProvider)
+
+
+def test_provider_factory_mibig():
+    from bgclens.literature.providers import get_provider
+    from bgclens.literature.providers.mibig import MIBiGProvider
+    p = get_provider("mibig")
+    assert isinstance(p, MIBiGProvider)
+
+
+def test_provider_factory_unknown_returns_none():
+    from bgclens.literature.providers import get_provider
+    p = get_provider("unknown_xyz")
+    assert p is None
+
+
+def test_provider_factory_env_var(monkeypatch):
+    import os
+    from bgclens.literature.providers import get_provider
+    from bgclens.literature.providers.europepmc import EuropePMCProvider
+    monkeypatch.setenv("BGCLENS_LITERATURE_PROVIDER", "europepmc")
+    p = get_provider()
+    assert isinstance(p, EuropePMCProvider)
