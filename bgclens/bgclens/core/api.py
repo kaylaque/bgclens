@@ -181,6 +181,19 @@ def recommend(
         safe_recs.sort(key=lambda r: order.get(r.literature_support, 4))
         safe_recs[0].is_recommended = True
 
+    if getattr(request, "objective", None) == "manufacturability":
+        from bgclens.manufacturability import compute_features, compute_profile, reorder_for_manufacturability
+        features = compute_features(project)
+        profile = compute_profile(features)
+        recommendations = reorder_for_manufacturability(recommendations, profile)
+        if recommendations:
+            recommendations[0].alternatives.append({
+                "objective": "manufacturability",
+                "tractability_score": profile.tractability_score,
+                "top_class": profile.top_class,
+                "notes": profile.notes,
+            })
+
     return validation, recommendations
 
 
