@@ -103,11 +103,12 @@ def merge_supports(
                 existing = merged[s.method_id]
                 # take the better support level
                 if _order.get(s.support_level, 99) < _order.get(existing.support_level, 99):
+                    deduped = _dedup_citations(existing.citations + s.citations)
                     merged[s.method_id] = MethodLiteratureSupport(
                         method_id=s.method_id,
                         support_level=s.support_level,
-                        work_count=existing.work_count + s.work_count,
-                        citations=_dedup_citations(existing.citations + s.citations),
+                        work_count=len(deduped),
+                        citations=deduped,
                         note=f"merged from {len(supports_list)} providers",
                     )
                 else:
