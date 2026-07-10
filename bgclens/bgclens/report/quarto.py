@@ -30,19 +30,10 @@ def _safe_get(obj, attr, default=None):
 
 
 def _build_qmd(method_id: str, run_id: str, method_hash: str,
-               provenance: dict, result_summary: dict | None) -> str:
+               provenance: dict, result_summary: dict | None,
+               has_literature: bool = False) -> str:
     """Build the .qmd document content."""
-    # Determine firewall badge
-    has_catalog = False
-    try:
-        if result_summary and isinstance(result_summary, dict):
-            confidence = result_summary.get("_confidence_band", "")
-            method_src = result_summary.get("_method_id", "")
-            # catalog methods are deterministic; literature-backed are precedent
-            has_catalog = bool(method_src) and "_literature" not in str(confidence).lower()
-    except Exception:
-        pass
-    badge = "deterministic" if has_catalog else "precedent"
+    badge = "precedent" if has_literature else "deterministic"
 
     # Embed SVG if present
     viz_section = ""
@@ -108,21 +99,25 @@ def render(run_record, out_dir: Path | str) -> QuartoReport:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Safely extract fields — handle both real RunRecord and mocks
-        method_id = _safe_get(run_record, "method_id", "unknown")
-        run_id = _safe_get(run_record, "run_id", "unknown")
-        provenance = _safe_get(run_record, "provenance", {}) or {}
         result_summary = _safe_get(run_record, "result_summary", None)
 
-        # If method_id not directly on object, try run_spec (real RunRecord)
-        if method_id == "unknown":
-            run_spec = _safe_get(run_record, "run_spec", {}) or {}
-            method_id = run_spec.get("method_id", "unknown") if isinstance(run_spec, dict) else "unknown"
+        # Real RunRecord stores method in run_spec; mocks may expose method_id directly
+        run_spec = _safe_get(run_record, "run_spec", {}) or {}
+        method_id = (
+            run_spec.get("method_id") if isinstance(run_spec, dict) else None
+        ) or _safe_get(run_record, "method_id", "unknown") or "unknown"
 
-        # If run_id not directly on object, use inputs_hash (real RunRecord)
-        if run_id == "unknown":
-            inputs_hash = _safe_get(run_record, "inputs_hash", "")
-            if inputs_hash:
-                run_id = str(inputs_hash)[:16]
+        # Real RunRecord uses inputs_hash as the run identifier; mocks expose run_id
+        inputs_hash = _safe_get(run_record, "inputs_hash", "") or ""
+        run_id = inputs_hash[:16] if inputs_hash else (_safe_get(run_record, "run_id", "unknown") or "unknown")
+
+        # Build provenance from real RunRecord fields (inputs_hash + run_spec + params)
+        provenance = _safe_get(run_record, "provenance", {}) or {}
+        if not provenance:
+            provenance = {
+                "inputs_hash": inputs_hash,
+                **(run_spec if isinstance(run_spec, dict) else {}),
+            }
 
         # Compute method hash from provenance
         try:
@@ -132,12 +127,16 @@ def render(run_record, out_dir: Path | str) -> QuartoReport:
         except Exception:
             method_hash = "000000000000"
 
+        # Determine if this run was literature-backed (RunRecord.literature non-empty)
+        literature = _safe_get(run_record, "literature", {}) or {}
+        has_literature = bool(literature and isinstance(literature, dict))
+
         # Build .qmd filename and content
         qmd_filename = f"{method_id}_{method_hash}.qmd"
         qmd_path = out_dir / qmd_filename
 
         try:
-            qmd_content = _build_qmd(method_id, run_id, method_hash, provenance, result_summary)
+            qmd_content = _build_qmd(method_id, run_id, method_hash, provenance, result_summary, has_literature)
         except Exception as e:
             qmd_content = f"---\ntitle: BGCLens Report\nparams:\n  method_id: \"{method_id}\"\n  run_id: \"{run_id}\"\nexecute:\n  freeze: auto\n---\n\n<!-- method_hash: {method_hash} -->\n\n**Firewall badge:** `deterministic`\n\n*Report generation error: {e}*\n"
 
@@ -176,10 +175,14 @@ def render(run_record, out_dir: Path | str) -> QuartoReport:
         )
 
     except Exception as exc:
-        # render() must never raise — return a safe fallback
+        # render() must never raise — return a spec-compliant fallback .qmd
         fallback_path = Path(out_dir) / "report_error.qmd"
         try:
-            fallback_path.write_text(f"---\ntitle: BGCLens Report (error)\n---\n\n*Render error: {exc}*\n")
+            fallback_path.write_text(
+                "---\ntitle: BGCLens Report (error)\nparams:\n  method_id: \"unknown\"\n  run_id: \"unknown\"\nexecute:\n  freeze: auto\n---\n\n"
+                "<!-- firewall: deterministic -->\n\n"
+                f"*Render error: {exc}*\n"
+            )
         except Exception:
             pass
         return QuartoReport(
