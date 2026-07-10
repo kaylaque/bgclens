@@ -28,7 +28,8 @@ class EuropePMCProvider:
                 continue
 
             time.sleep(_RATE_LIMIT_SLEEP)
-            query = f'"{method_term}" AND ({" OR ".join(f"{t}" for t in topic_terms[:5])})'
+            quoted_topics = " OR ".join('"' + t + '"' for t in topic_terms[:5])
+            query = f'"{method_term}" AND ({quoted_topics})'
             works = _search_works(query, per_page=max_citations + 2)
 
             validated = []

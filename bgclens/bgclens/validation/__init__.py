@@ -16,6 +16,6 @@ _METHOD_VALIDATORS: dict[str, list] = {
     "diversity": _DIVERSITY,
     "fisher_enrichment": _ENRICHMENT,
     "clustering": _CLUSTERING,
-    "community_detection": _CLUSTERING,
+    "louvain_community": _CLUSTERING,
     "permanova": _PERMANOVA,
 }

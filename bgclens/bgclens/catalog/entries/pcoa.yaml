@@ -1,7 +1,7 @@
 id: pcoa
 name: Principal Coordinates Analysis (PCoA / PCA of distances)
-intents: [ordination, sq3_prioritization, sq5_diversity]
-sq: [sq3_prioritization, sq5_diversity]
+intents: [ordination, sq2_novelty, sq3_prioritization, sq5_diversity]
+sq: [sq2_novelty, sq3_prioritization, sq5_diversity]
 requires:
   presence_absence: presence_absence_matrix
 params:

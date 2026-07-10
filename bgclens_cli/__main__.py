@@ -43,7 +43,7 @@ def open_cmd(
 @app.command("recommend")
 def recommend_cmd(
     project: Path = typer.Argument(..., help="BGCFlow project directory."),
-    intent: str = typer.Option(..., "--intent", "-i", help="Analysis intent: enrichment|diversity|ordination|clustering|comparison|network_structure"),
+    intent: str = typer.Option(..., "--intent", "-i", help="Analysis intent: enrichment|diversity|ordination|clustering|comparison|network_structure|sq1_inventory|sq2_novelty|sq3_prioritization|sq4_distribution|sq5_diversity|sq6_genomic_context|sq7_association"),
     topic: str = typer.Option("BGC analysis", "--topic", "-t", help="Research question (free text, used for literature ranking)."),
     no_literature: bool = typer.Option(False, "--no-literature", help="Skip literature ranking (faster)."),
 ) -> None:

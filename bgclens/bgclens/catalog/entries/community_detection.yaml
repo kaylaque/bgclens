@@ -1,7 +1,7 @@
 id: louvain_community
 name: Louvain Community Detection (GCF network)
-intents: [network_structure, sq5_diversity]
-sq: [sq5_diversity]
+intents: [network_structure, sq5_diversity, sq6_genomic_context]
+sq: [sq5_diversity, sq6_genomic_context]
 requires:
   network: network_edge_list
 params:

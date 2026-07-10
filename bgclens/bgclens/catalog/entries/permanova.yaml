@@ -1,7 +1,7 @@
 id: permanova
 name: PERMANOVA (Permutational ANOVA of distances)
-intents: [comparison, sq7_association]
-sq: [sq7_association]
+intents: [comparison, sq6_genomic_context, sq7_association]
+sq: [sq6_genomic_context, sq7_association]
 requires:
   presence_absence: presence_absence_matrix
   grouping_col: str
