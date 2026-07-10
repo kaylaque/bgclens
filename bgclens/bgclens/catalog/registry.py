@@ -60,11 +60,14 @@ def methods_for_intent(intent: str) -> list[dict]:
     return [e for e in catalog.values() if intent in e.get("intents", [])]
 
 
+_CATALOG_REQUIRED_FIELDS = ("id", "name", "intents", "impl", "citation")
+
+
 def validate_catalog() -> list[str]:
     """CI validator: return list of error strings (empty = all OK)."""
     errors = []
     for method_id, entry in load_catalog().items():
-        for required_field in ("id", "name", "intents", "impl", "citation"):
+        for required_field in _CATALOG_REQUIRED_FIELDS:
             if required_field not in entry:
                 errors.append(f"{method_id}: missing field '{required_field}'")
         try:

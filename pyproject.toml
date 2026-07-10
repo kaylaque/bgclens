@@ -46,7 +46,7 @@ dev = [
 bgclens = "bgclens_cli.__main__:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["bgclens", "bgclens_cli", "bgclens_web"]
+packages = ["bgclens/bgclens", "bgclens_cli", "bgclens_web"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -62,8 +62,3 @@ target-version = "py311"
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
-
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-]

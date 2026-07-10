@@ -1,5 +1,6 @@
 """Core engine API — the only thing CLI and web surfaces import for analysis."""
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,12 @@ from bgclens.core.intent import (
     AnalysisRequest, Intent, IntentValidation,
     validate_intent, filter_methods_for_intent,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class MissingRequirementError(ValueError):
+    """Raised when a method requires data that is absent from the project."""
 
 
 def open_project(path: Path | str) -> Project:
@@ -87,69 +94,84 @@ def recommend(
     if not candidates:
         return validation, []
 
-    # Build inputs dict for cost estimation
-    inputs = _build_inputs(project, candidates[0] if candidates else {})
+    # Apply method_hint filter when specified
+    if request.method_hint:
+        hinted = [m for m in candidates if m["id"] == request.method_hint]
+        if hinted:
+            candidates = hinted
 
-    # Cost assessment for each candidate
-    recommendations: list[MethodRecommendation] = []
-    for method in candidates:
-        method_id = method["id"]
+    try:
+        # Cost assessment for each candidate
+        recommendations: list[MethodRecommendation] = []
+        for method in candidates:
+            method_id = method["id"]
 
-        # Assumption checks
-        try:
-            from bgclens.catalog.registry import get_impl
-            _, check_fn, _ = get_impl(method_id)
-            method_inputs = _build_inputs(project, method)
-            warnings = check_fn(method_inputs, {})
-        except Exception:
-            warnings = []
+            # Assumption checks
+            try:
+                from bgclens.catalog.registry import get_impl
+                _, check_fn, _ = get_impl(method_id)
+                method_inputs = _build_inputs(project, method)
+                warnings = check_fn(method_inputs, {})
+            except MissingRequirementError:
+                raise
+            except (KeyError, AttributeError, ImportError) as e:
+                logger.warning("assumption check skipped for %s: %s", method_id, e)
+                warnings = []
 
-        # Cost assessment
-        try:
-            from bgclens.compute.advisor import assess
-            method_inputs = _build_inputs(project, method)
-            assessment = assess(method_id, method_inputs, {})
-            cost_class = assessment.cost_class
-            cost_reason = assessment.reason
-            alts = [{"method_id": a.method_id, "trade_off": a.trade_off} for a in assessment.alternatives]
-        except Exception as e:
-            cost_class = "Safe"
-            cost_reason = f"Cost estimation unavailable: {e}"
-            alts = []
+            # Cost assessment
+            try:
+                from bgclens.compute.advisor import assess
+                method_inputs = _build_inputs(project, method)
+                assessment = assess(method_id, method_inputs, {})
+                cost_class = assessment.cost_class
+                cost_reason = assessment.reason
+                alts = [{"method_id": a.method_id, "trade_off": a.trade_off} for a in assessment.alternatives]
+            except MissingRequirementError:
+                raise
+            except (ImportError, KeyError, ValueError) as e:
+                logger.warning("cost estimation unavailable for %s: %s", method_id, e)
+                cost_class = "Safe"
+                cost_reason = f"Cost estimation unavailable: {e}"
+                alts = []
 
-        recommendations.append(MethodRecommendation(
-            method_id=method_id,
-            method_name=method.get("name", method_id),
-            intent=request.intent.value if isinstance(request.intent, Intent) else str(request.intent),
-            cost_class=cost_class,
-            cost_reason=cost_reason,
-            assumption_warnings=warnings,
-            alternatives=alts,
-        ))
+            recommendations.append(MethodRecommendation(
+                method_id=method_id,
+                method_name=method.get("name", method_id),
+                intent=request.intent.value if isinstance(request.intent, Intent) else str(request.intent),
+                cost_class=cost_class,
+                cost_reason=cost_reason,
+                assumption_warnings=warnings,
+                alternatives=alts,
+            ))
 
-    # Literature ranking (optional, graceful fallback)
-    if use_literature:
-        try:
-            from bgclens.literature.openalex import OpenAlexProvider
-            from bgclens.literature.ranker import rank_methods
-            method_names = {r.method_id: r.method_name for r in recommendations}
-            ranking = rank_methods(
-                method_ids=[r.method_id for r in recommendations],
-                method_display_names=method_names,
-                topic=request.topic,
-                provider=OpenAlexProvider(),
-            )
-            rank_map = {s.method_id: s for s in ranking.method_rankings}
-            for rec in recommendations:
-                support = rank_map.get(rec.method_id)
-                if support:
-                    rec.literature_support = support.support_level
-                    rec.literature_citations = [
-                        {"title": c.title, "year": c.year, "doi": c.doi}
-                        for c in support.citations
-                    ]
-        except Exception:
-            pass  # literature ranking is non-blocking
+        # Literature ranking (optional, graceful fallback)
+        if use_literature:
+            try:
+                from bgclens.literature.providers import get_provider
+                from bgclens.literature.ranker import rank_methods
+                method_names = {r.method_id: r.method_name for r in recommendations}
+                provider = get_provider()
+                ranking = rank_methods(
+                    method_ids=[r.method_id for r in recommendations],
+                    method_display_names=method_names,
+                    topic=request.topic,
+                    provider=provider,
+                )
+                rank_map = {s.method_id: s for s in ranking.method_rankings}
+                for rec in recommendations:
+                    support = rank_map.get(rec.method_id)
+                    if support:
+                        rec.literature_support = support.support_level
+                        rec.literature_citations = [
+                            {"title": c.title, "year": c.year, "doi": c.doi}
+                            for c in support.citations
+                        ]
+            except Exception as e:
+                logger.warning("literature ranking skipped: %s", e)
+
+    except MissingRequirementError as e:
+        intent_str = request.intent.value if isinstance(request.intent, Intent) else str(request.intent)
+        return IntentValidation(valid=False, intent=intent_str, missing_data=[], suggestion=str(e)), []
 
     # Mark top recommended method (Safe + strongest literature support or first Safe)
     safe_recs = [r for r in recommendations if r.cost_class == "Safe"]
@@ -158,6 +180,19 @@ def recommend(
         order = {"strong": 0, "moderate": 1, "weak": 2, "none": 3, "unknown": 4}
         safe_recs.sort(key=lambda r: order.get(r.literature_support, 4))
         safe_recs[0].is_recommended = True
+
+    if getattr(request, "objective", None) == "manufacturability":
+        from bgclens.manufacturability import compute_features, compute_profile, reorder_for_manufacturability
+        features = compute_features(project)
+        profile = compute_profile(features)
+        recommendations = reorder_for_manufacturability(recommendations, profile)
+        if recommendations:
+            recommendations[0].alternatives.append({
+                "objective": "manufacturability",
+                "tractability_score": profile.tractability_score,
+                "top_class": profile.top_class,
+                "notes": profile.notes,
+            })
 
     return validation, recommendations
 
@@ -181,19 +216,44 @@ def run(project: "Project", method_id: str, params: dict[str, Any] | None = None
         "method_id": method_id,
         "params": params,
     }
+
+    from bgclens.validation import evaluate
+    validation_result = evaluate(method_id, result)
+    result["_confidence_band"] = validation_result.confidence_band
+    result["_validation_checks"] = [
+        {"name": c.name, "passed": c.passed, "detail": c.detail}
+        for c in validation_result.checks
+    ]
+
     return result
 
 
 def _build_inputs(project: "Project", method_entry: dict) -> dict:
-    """Build the inputs dict for a method from the loaded project."""
+    """Build the inputs dict for a method from the loaded project.
+
+    Raises:
+        MissingRequirementError: when a required dataset is absent from the project.
+    """
     requires = method_entry.get("requires", {}) if method_entry else {}
     inputs: dict = {}
 
-    if "presence_absence" in requires and project.gcf_presence_absence:
+    if "presence_absence" in requires:
+        if project.gcf_presence_absence is None:
+            raise MissingRequirementError(
+                "presence_absence matrix required but not found. Run BiG-SCAPE with BGCFlow first."
+            )
         inputs["presence_absence"] = project.gcf_presence_absence
-    if "counts" in requires and project.bgc_counts:
+    if "counts" in requires:
+        if project.bgc_counts is None:
+            raise MissingRequirementError(
+                "bgc_counts table required but not found. Run antiSMASH with BGCFlow first."
+            )
         inputs["counts"] = project.bgc_counts
-    if "network" in requires and project.gcf_network:
+    if "network" in requires:
+        if project.gcf_network is None:
+            raise MissingRequirementError(
+                "gcf_network required but not found. Run BiG-SCAPE with BGCFlow first."
+            )
         inputs["network"] = project.gcf_network
     if project.metadata:
         inputs["metadata"] = project.metadata

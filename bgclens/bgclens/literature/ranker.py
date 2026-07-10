@@ -71,6 +71,50 @@ def _offline_fallback(
     return LiteratureRanking(
         topic=topic,
         method_rankings=supports,
-        provider="openalex",
+        provider="offline",
         offline=True,
     )
+
+
+def _dedup_citations(citations: list) -> list:
+    """Deduplicate citations by DOI (or title as fallback)."""
+    seen_keys: set[str] = set()
+    result = []
+    for c in citations:
+        key = c.doi or c.title
+        if key and key not in seen_keys:
+            seen_keys.add(key)
+            result.append(c)
+    return result
+
+
+def merge_supports(
+    supports_list: list[list[MethodLiteratureSupport]],
+    method_ids: list[str],
+) -> list[MethodLiteratureSupport]:
+    """Merge support lists from multiple providers: take max support_level, combine citations."""
+    merged: dict[str, MethodLiteratureSupport] = {}
+    _order = {"strong": 0, "moderate": 1, "weak": 2, "none": 3}
+    for supports in supports_list:
+        for s in supports:
+            if s.method_id not in merged:
+                merged[s.method_id] = s
+            else:
+                existing = merged[s.method_id]
+                # take the better support level
+                if _order.get(s.support_level, 99) < _order.get(existing.support_level, 99):
+                    deduped = _dedup_citations(existing.citations + s.citations)
+                    merged[s.method_id] = MethodLiteratureSupport(
+                        method_id=s.method_id,
+                        support_level=s.support_level,
+                        work_count=len(deduped),
+                        citations=deduped,
+                        note=f"merged from {len(supports_list)} providers",
+                    )
+                else:
+                    existing.citations = _dedup_citations(existing.citations + s.citations)
+                    existing.work_count = len(existing.citations)
+    return [
+        merged.get(mid, MethodLiteratureSupport(method_id=mid, support_level="none", work_count=0))
+        for mid in method_ids
+    ]
