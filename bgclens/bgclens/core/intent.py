@@ -40,6 +40,7 @@ class AnalysisRequest:
     topic: str
     intent: Intent
     method_hint: str | None = None   # optional pre-selected method_id
+    objective: str | None = None     # e.g. "manufacturability"
 
 
 @dataclass
