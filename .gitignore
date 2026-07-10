@@ -1,1 +1,25 @@
 .DS_Store
+
+# Secrets — .env.example is tracked, .env never is
+.env
+
+# VS Code Local History extension: snapshots files verbatim, including .env
+.history/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Claude Code local state
+.claude/worktrees/
+.claude/agent-memory/
+
+# Generated deck renders (sources live in decks/*.md)
+/bgclens-*.html
+decks/*.pdf
+decks/*.html
