@@ -1,5 +1,6 @@
 """Core engine API — the only thing CLI and web surfaces import for analysis."""
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,12 @@ from bgclens.core.intent import (
     AnalysisRequest, Intent, IntentValidation,
     validate_intent, filter_methods_for_intent,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class MissingRequirementError(ValueError):
+    """Raised when a method requires data that is absent from the project."""
 
 
 def open_project(path: Path | str) -> Project:
@@ -87,8 +94,12 @@ def recommend(
     if not candidates:
         return validation, []
 
-    # Build inputs dict for cost estimation
-    inputs = _build_inputs(project, candidates[0] if candidates else {})
+    # Apply method_hint filter when specified
+    if request.method_hint:
+        hinted = [m for m in candidates if m["id"] == request.method_hint]
+        if hinted:
+            candidates = hinted
+    # else: graceful degradation, return full list
 
     # Cost assessment for each candidate
     recommendations: list[MethodRecommendation] = []
@@ -101,7 +112,10 @@ def recommend(
             _, check_fn, _ = get_impl(method_id)
             method_inputs = _build_inputs(project, method)
             warnings = check_fn(method_inputs, {})
-        except Exception:
+        except MissingRequirementError:
+            raise
+        except (KeyError, AttributeError, ImportError) as e:
+            logger.warning("assumption check skipped for %s: %s", method_id, e)
             warnings = []
 
         # Cost assessment
@@ -112,7 +126,10 @@ def recommend(
             cost_class = assessment.cost_class
             cost_reason = assessment.reason
             alts = [{"method_id": a.method_id, "trade_off": a.trade_off} for a in assessment.alternatives]
-        except Exception as e:
+        except MissingRequirementError:
+            raise
+        except (ImportError, KeyError, ValueError) as e:
+            logger.warning("cost estimation unavailable for %s: %s", method_id, e)
             cost_class = "Safe"
             cost_reason = f"Cost estimation unavailable: {e}"
             alts = []
@@ -148,8 +165,8 @@ def recommend(
                         {"title": c.title, "year": c.year, "doi": c.doi}
                         for c in support.citations
                     ]
-        except Exception:
-            pass  # literature ranking is non-blocking
+        except Exception as e:
+            logger.warning("literature ranking skipped: %s", e)
 
     # Mark top recommended method (Safe + strongest literature support or first Safe)
     safe_recs = [r for r in recommendations if r.cost_class == "Safe"]
@@ -185,15 +202,31 @@ def run(project: "Project", method_id: str, params: dict[str, Any] | None = None
 
 
 def _build_inputs(project: "Project", method_entry: dict) -> dict:
-    """Build the inputs dict for a method from the loaded project."""
+    """Build the inputs dict for a method from the loaded project.
+
+    Raises:
+        MissingRequirementError: when a required dataset is absent from the project.
+    """
     requires = method_entry.get("requires", {}) if method_entry else {}
     inputs: dict = {}
 
-    if "presence_absence" in requires and project.gcf_presence_absence:
+    if "presence_absence" in requires:
+        if project.gcf_presence_absence is None:
+            raise MissingRequirementError(
+                "presence_absence matrix required but not found. Run BiG-SCAPE with BGCFlow first."
+            )
         inputs["presence_absence"] = project.gcf_presence_absence
-    if "counts" in requires and project.bgc_counts:
+    if "counts" in requires:
+        if project.bgc_counts is None:
+            raise MissingRequirementError(
+                "bgc_counts table required but not found. Run antiSMASH with BGCFlow first."
+            )
         inputs["counts"] = project.bgc_counts
-    if "network" in requires and project.gcf_network:
+    if "network" in requires:
+        if project.gcf_network is None:
+            raise MissingRequirementError(
+                "gcf_network required but not found. Run BiG-SCAPE with BGCFlow first."
+            )
         inputs["network"] = project.gcf_network
     if project.metadata:
         inputs["metadata"] = project.metadata

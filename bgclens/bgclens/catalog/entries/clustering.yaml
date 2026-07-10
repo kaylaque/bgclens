@@ -1,6 +1,7 @@
 id: hierarchical_clustering
 name: Hierarchical Clustering (Ward / complete linkage)
-intents: [clustering]
+intents: [clustering, sq3_prioritization]
+sq: [sq3_prioritization]
 requires:
   presence_absence: presence_absence_matrix
 params:

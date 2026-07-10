@@ -1,6 +1,7 @@
 id: alpha_diversity
 name: Alpha Diversity (Shannon, Simpson, rarefaction)
-intents: [diversity]
+intents: [diversity, sq5_diversity]
+sq: [sq5_diversity]
 requires:
   counts: feature_count_table
 params:

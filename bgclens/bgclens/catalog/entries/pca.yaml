@@ -1,6 +1,7 @@
 id: pca
 name: Principal Component Analysis (PCA)
-intents: [ordination]
+intents: [ordination, sq3_prioritization, sq5_diversity]
+sq: [sq3_prioritization, sq5_diversity]
 requires:
   counts: feature_count_table
 params:

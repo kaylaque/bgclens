@@ -8,13 +8,32 @@ from bgclens.model import Project
 
 
 class Intent(str, Enum):
+    # Existing (keep unchanged)
     enrichment = "enrichment"
     diversity = "diversity"
     ordination = "ordination"
     clustering = "clustering"
     comparison = "comparison"
     network_structure = "network_structure"
+    # SQ taxonomy (Phase 1)
+    sq1_inventory = "sq1_inventory"
+    sq2_novelty = "sq2_novelty"
+    sq3_prioritization = "sq3_prioritization"
+    sq4_distribution = "sq4_distribution"
+    sq5_diversity = "sq5_diversity"
+    sq6_genomic_context = "sq6_genomic_context"
+    sq7_association = "sq7_association"
 
+
+SQ_LABELS: dict[str, str] = {
+    "sq1_inventory":      "Inventory — what / how many BGCs?",
+    "sq2_novelty":        "Novelty — known vs new?",
+    "sq3_prioritization": "Prioritization — which to chase in the lab?",
+    "sq4_distribution":   "Distribution — how spread across strains/taxa?",
+    "sq5_diversity":      "Diversity / sampling — how diverse, is it saturated?",
+    "sq6_genomic_context":"Genomic context — core vs accessory, resistance, HGT",
+    "sq7_association":    "Association — do BGCs track phenotype/metadata?",
+}
 
 INTENT_REQUIREMENTS: dict[str, list[str]] = {
     "enrichment":        ["bgc_counts"],
@@ -23,6 +42,14 @@ INTENT_REQUIREMENTS: dict[str, list[str]] = {
     "clustering":        ["gcf_presence_absence"],
     "comparison":        ["gcf_presence_absence"],
     "network_structure": ["gcf_network"],
+    # SQ taxonomy (Phase 1)
+    "sq1_inventory":      ["bgc_counts"],
+    "sq2_novelty":        ["gcf_presence_absence"],
+    "sq3_prioritization": ["gcf_presence_absence"],
+    "sq4_distribution":   ["bgc_counts"],
+    "sq5_diversity":      ["gcf_presence_absence"],
+    "sq6_genomic_context":["gcf_network"],
+    "sq7_association":    ["gcf_presence_absence"],
 }
 
 INTENT_PIPELINE_SOURCES: dict[str, str] = {
@@ -32,6 +59,14 @@ INTENT_PIPELINE_SOURCES: dict[str, str] = {
     "clustering":        "bigscape (GCF presence/absence matrix)",
     "comparison":        "bigscape (GCF presence/absence matrix)",
     "network_structure": "bigscape (GCF similarity network)",
+    # SQ taxonomy (Phase 1)
+    "sq1_inventory":      "antismash (BGC class counts per genome)",
+    "sq2_novelty":        "bigscape (GCF family novelty via MIBiG distance)",
+    "sq3_prioritization": "bigscape (GCF presence/absence matrix)",
+    "sq4_distribution":   "antismash (BGC class counts per genome)",
+    "sq5_diversity":      "bigscape (GCF presence/absence matrix)",
+    "sq6_genomic_context":"bigscape (GCF similarity network)",
+    "sq7_association":    "bigscape (GCF presence/absence matrix)",
 }
 
 

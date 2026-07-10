@@ -1,6 +1,7 @@
 id: fisher_enrichment
 name: Fisher's Exact Test (BGC class enrichment)
-intents: [enrichment]
+intents: [enrichment, sq1_inventory, sq4_distribution]
+sq: [sq1_inventory, sq4_distribution]
 requires:
   counts: feature_count_table
   grouping_col: str
