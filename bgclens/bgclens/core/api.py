@@ -202,6 +202,15 @@ def run(project: "Project", method_id: str, params: dict[str, Any] | None = None
         "method_id": method_id,
         "params": params,
     }
+
+    from bgclens.validation import evaluate
+    validation_result = evaluate(method_id, result)
+    result["_confidence_band"] = validation_result.confidence_band
+    result["_validation_checks"] = [
+        {"name": c.name, "passed": c.passed, "detail": c.detail}
+        for c in validation_result.checks
+    ]
+
     return result
 
 
