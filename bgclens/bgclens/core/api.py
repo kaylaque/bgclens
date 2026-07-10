@@ -99,74 +99,78 @@ def recommend(
         hinted = [m for m in candidates if m["id"] == request.method_hint]
         if hinted:
             candidates = hinted
-    # else: graceful degradation, return full list
 
-    # Cost assessment for each candidate
-    recommendations: list[MethodRecommendation] = []
-    for method in candidates:
-        method_id = method["id"]
+    try:
+        # Cost assessment for each candidate
+        recommendations: list[MethodRecommendation] = []
+        for method in candidates:
+            method_id = method["id"]
 
-        # Assumption checks
-        try:
-            from bgclens.catalog.registry import get_impl
-            _, check_fn, _ = get_impl(method_id)
-            method_inputs = _build_inputs(project, method)
-            warnings = check_fn(method_inputs, {})
-        except MissingRequirementError:
-            raise
-        except (KeyError, AttributeError, ImportError) as e:
-            logger.warning("assumption check skipped for %s: %s", method_id, e)
-            warnings = []
+            # Assumption checks
+            try:
+                from bgclens.catalog.registry import get_impl
+                _, check_fn, _ = get_impl(method_id)
+                method_inputs = _build_inputs(project, method)
+                warnings = check_fn(method_inputs, {})
+            except MissingRequirementError:
+                raise
+            except (KeyError, AttributeError, ImportError) as e:
+                logger.warning("assumption check skipped for %s: %s", method_id, e)
+                warnings = []
 
-        # Cost assessment
-        try:
-            from bgclens.compute.advisor import assess
-            method_inputs = _build_inputs(project, method)
-            assessment = assess(method_id, method_inputs, {})
-            cost_class = assessment.cost_class
-            cost_reason = assessment.reason
-            alts = [{"method_id": a.method_id, "trade_off": a.trade_off} for a in assessment.alternatives]
-        except MissingRequirementError:
-            raise
-        except (ImportError, KeyError, ValueError) as e:
-            logger.warning("cost estimation unavailable for %s: %s", method_id, e)
-            cost_class = "Safe"
-            cost_reason = f"Cost estimation unavailable: {e}"
-            alts = []
+            # Cost assessment
+            try:
+                from bgclens.compute.advisor import assess
+                method_inputs = _build_inputs(project, method)
+                assessment = assess(method_id, method_inputs, {})
+                cost_class = assessment.cost_class
+                cost_reason = assessment.reason
+                alts = [{"method_id": a.method_id, "trade_off": a.trade_off} for a in assessment.alternatives]
+            except MissingRequirementError:
+                raise
+            except (ImportError, KeyError, ValueError) as e:
+                logger.warning("cost estimation unavailable for %s: %s", method_id, e)
+                cost_class = "Safe"
+                cost_reason = f"Cost estimation unavailable: {e}"
+                alts = []
 
-        recommendations.append(MethodRecommendation(
-            method_id=method_id,
-            method_name=method.get("name", method_id),
-            intent=request.intent.value if isinstance(request.intent, Intent) else str(request.intent),
-            cost_class=cost_class,
-            cost_reason=cost_reason,
-            assumption_warnings=warnings,
-            alternatives=alts,
-        ))
+            recommendations.append(MethodRecommendation(
+                method_id=method_id,
+                method_name=method.get("name", method_id),
+                intent=request.intent.value if isinstance(request.intent, Intent) else str(request.intent),
+                cost_class=cost_class,
+                cost_reason=cost_reason,
+                assumption_warnings=warnings,
+                alternatives=alts,
+            ))
 
-    # Literature ranking (optional, graceful fallback)
-    if use_literature:
-        try:
-            from bgclens.literature.openalex import OpenAlexProvider
-            from bgclens.literature.ranker import rank_methods
-            method_names = {r.method_id: r.method_name for r in recommendations}
-            ranking = rank_methods(
-                method_ids=[r.method_id for r in recommendations],
-                method_display_names=method_names,
-                topic=request.topic,
-                provider=OpenAlexProvider(),
-            )
-            rank_map = {s.method_id: s for s in ranking.method_rankings}
-            for rec in recommendations:
-                support = rank_map.get(rec.method_id)
-                if support:
-                    rec.literature_support = support.support_level
-                    rec.literature_citations = [
-                        {"title": c.title, "year": c.year, "doi": c.doi}
-                        for c in support.citations
-                    ]
-        except Exception as e:
-            logger.warning("literature ranking skipped: %s", e)
+        # Literature ranking (optional, graceful fallback)
+        if use_literature:
+            try:
+                from bgclens.literature.openalex import OpenAlexProvider
+                from bgclens.literature.ranker import rank_methods
+                method_names = {r.method_id: r.method_name for r in recommendations}
+                ranking = rank_methods(
+                    method_ids=[r.method_id for r in recommendations],
+                    method_display_names=method_names,
+                    topic=request.topic,
+                    provider=OpenAlexProvider(),
+                )
+                rank_map = {s.method_id: s for s in ranking.method_rankings}
+                for rec in recommendations:
+                    support = rank_map.get(rec.method_id)
+                    if support:
+                        rec.literature_support = support.support_level
+                        rec.literature_citations = [
+                            {"title": c.title, "year": c.year, "doi": c.doi}
+                            for c in support.citations
+                        ]
+            except Exception as e:
+                logger.warning("literature ranking skipped: %s", e)
+
+    except MissingRequirementError as e:
+        intent_str = request.intent.value if isinstance(request.intent, Intent) else str(request.intent)
+        return IntentValidation(valid=False, intent=intent_str, missing_data=[], suggestion=str(e)), []
 
     # Mark top recommended method (Safe + strongest literature support or first Safe)
     safe_recs = [r for r in recommendations if r.cost_class == "Safe"]

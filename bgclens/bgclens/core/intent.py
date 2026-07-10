@@ -8,14 +8,12 @@ from bgclens.model import Project
 
 
 class Intent(str, Enum):
-    # Existing (keep unchanged)
     enrichment = "enrichment"
     diversity = "diversity"
     ordination = "ordination"
     clustering = "clustering"
     comparison = "comparison"
     network_structure = "network_structure"
-    # SQ taxonomy (Phase 1)
     sq1_inventory = "sq1_inventory"
     sq2_novelty = "sq2_novelty"
     sq3_prioritization = "sq3_prioritization"
@@ -42,7 +40,7 @@ INTENT_REQUIREMENTS: dict[str, list[str]] = {
     "clustering":        ["gcf_presence_absence"],
     "comparison":        ["gcf_presence_absence"],
     "network_structure": ["gcf_network"],
-    # SQ taxonomy (Phase 1)
+
     "sq1_inventory":      ["bgc_counts"],
     "sq2_novelty":        ["gcf_presence_absence"],
     "sq3_prioritization": ["gcf_presence_absence"],
@@ -59,7 +57,7 @@ INTENT_PIPELINE_SOURCES: dict[str, str] = {
     "clustering":        "bigscape (GCF presence/absence matrix)",
     "comparison":        "bigscape (GCF presence/absence matrix)",
     "network_structure": "bigscape (GCF similarity network)",
-    # SQ taxonomy (Phase 1)
+
     "sq1_inventory":      "antismash (BGC class counts per genome)",
     "sq2_novelty":        "bigscape (GCF family novelty via MIBiG distance)",
     "sq3_prioritization": "bigscape (GCF presence/absence matrix)",

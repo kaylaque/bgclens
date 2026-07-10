@@ -251,3 +251,39 @@ def test_missing_requirement_error_counts():
     method_entry = {"id": "alpha_diversity", "requires": {"counts": "feature_count_table"}}
     with pytest.raises(MissingRequirementError):
         _build_inputs(project, method_entry)
+
+
+def test_recommend_missing_requirement_returns_graceful_failure():
+    """recommend() converts MissingRequirementError to IntentValidation(valid=False) instead of raising."""
+    from bgclens.core.api import recommend
+    from bgclens.core.intent import AnalysisRequest, IntentValidation
+    # sq2_novelty requires gcf_presence_absence; validate_intent will pass (has_pa=True),
+    # but the catalog method for pcoa requires presence_absence which _build_inputs checks too.
+    # To force MissingRequirementError through recommend(), we need validate_intent to pass
+    # but _build_inputs to fail. We achieve this by giving the project pa=True so validation
+    # passes, then monkeypatch filter_methods_for_intent to return a method requiring
+    # data that is missing.
+    # Simpler: use a project with pa=None and intent that only needs counts so validate_intent
+    # passes, but the catalog method requires pa. Use Intent.sq3_prioritization with
+    # has_pa=False: validate_intent will detect missing pa and return valid=False already.
+    # Instead, directly craft a scenario where validate_intent passes but _build_inputs fails.
+    # We can do this by patching filter_methods_for_intent to inject a method that requires
+    # 'network' even though the intent doesn't declare that dependency.
+    import unittest.mock as mock
+    from bgclens.core.api import MissingRequirementError
+
+    project = _make_project(has_pa=True, has_counts=True)
+    # Inject a fake method that requires 'network' (gcf_network is None on our project)
+    fake_method = {
+        "id": "fake_net_method",
+        "name": "Fake Network Method",
+        "requires": {"network": "gcf_network"},
+        "intents": ["ordination"],
+    }
+    request = AnalysisRequest(topic="test", intent=Intent.ordination)
+    with mock.patch("bgclens.core.api.filter_methods_for_intent", return_value=[fake_method]):
+        validation, recs = recommend(project, request, use_literature=False)
+
+    assert validation.valid is False
+    assert recs == []
+    assert isinstance(validation, IntentValidation)

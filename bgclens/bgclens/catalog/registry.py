@@ -61,7 +61,6 @@ def methods_for_intent(intent: str) -> list[dict]:
 
 
 _CATALOG_REQUIRED_FIELDS = ("id", "name", "intents", "impl", "citation")
-_CATALOG_OPTIONAL_FIELDS = {"requires", "params", "assumptions", "cost_model", "sq"}
 
 
 def validate_catalog() -> list[str]:
