@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<!--
+  CANONICAL LESSON BASELINE for the /teach skill.
+  Use this file to seed a teaching workspace's first lesson and shared assets.
+  For multi-lesson workspaces, factor reusable styling and behavior into
+  <workspace>/assets/ instead of repeatedly copying them between lessons.
+  The baseline <style> block is deliberately ACCESSIBLE:
+
+  - Every dark container (.defense) re-asserts the color of nested <code>, so
+    inline code never ends up light-on-light (the classic cascade-gap bug).
+  - <meta viewport> is present so lessons read well on mobile.
+  - Body/background contrast is WCAG AA or better.
+  - Code blocks include a visible .listen explanation for screen-reader and
+    phone-audio use; raw punctuation-heavy <pre> blocks are hidden from the
+    accessibility tree because WebKit/VoiceOver otherwise reads the rendered
+    text symbol-by-symbol even when role="img" or aria-label is present.
+
+  Lessons and assets should work over file:// and ordinary static hosting
+  without a build step. Workspace-specific hosting belongs in HOSTING.md.
+  Editing this template does NOT update
+  already-shipped lessons or workspace assets — fix those in place.
+
+  Source references MUST carry both a VS Code chip (.vsc, local) and a GitHub
+  permalink chip (.gh, pinned to the reviewed commit SHA) — see .srcline below.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson N — TITLE</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#6b6b6b; --rule:#e0ddd6; --accent:#2e5c7a;
+          --add:#2e7d32; --del:#b23b3b; --warn:#9a7d1f; }
+  body { font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+         max-width:42rem; margin:3rem auto; padding:0 1.5rem; color:var(--ink);
+         line-height:1.58; background:#fbfaf7; }
+  h1 { font-size:1.9rem; line-height:1.15; margin-bottom:.2rem; }
+  .sub { color:var(--muted); font-style:italic; margin-top:0; }
+  h2 { font-size:1.15rem; margin-top:2.2rem; border-bottom:1px solid var(--rule);
+       padding-bottom:.25rem; }
+  h3 { font-size:1rem; margin-top:1.5rem; color:var(--accent); }
+  code { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.84em;
+         background:#eef1f4; padding:.1em .3em; border-radius:3px; }
+  figure { margin:1.2rem 0; }
+  figcaption { font-size:.86rem; color:var(--muted); margin-bottom:.35rem; }
+  pre { background:#f4f6f8; border-left:3px solid var(--accent); padding:.9rem 1rem;
+        overflow-x:auto; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.79rem;
+        line-height:1.45; }
+  blockquote { border-left:3px solid var(--warn); margin:1.2rem 0; padding:.3rem 1rem;
+               color:#3a3a3a; background:#faf6ea; }
+  table { border-collapse:collapse; width:100%; font-size:.82rem; margin:1rem 0; }
+  th,td { border:1px solid var(--rule); padding:.45rem .55rem; text-align:left; vertical-align:top; }
+  th { background:#eef1f4; }
+  .defense { background:#1a1a1a; color:#f4f1e8; padding:1rem 1.2rem; border-radius:6px;
+             margin:1.4rem 0; }
+  .defense b { color:#e8c98a; }
+  /* REQUIRED: re-assert code color inside the dark box so it isn't light-on-light */
+  .defense code { background:#3a3f44; color:#f4f1e8; }
+  a { color:var(--accent); }
+  .add { color:var(--add); } .del { color:var(--del); }
+  .foot { margin-top:2.5rem; border-top:1px solid var(--rule); padding-top:1rem;
+          font-size:.85rem; color:var(--muted); }
+  .ask { background:#eef4f7; border:1px solid #cfe0e8; border-radius:6px;
+         padding:.7rem 1rem; font-size:.9rem; }
+  .listen { background:#fff7df; border:1px solid #eadca8; border-radius:6px;
+            padding:.7rem 1rem; font-size:.9rem; }
+  .skip { position:absolute; left:-999px; top:auto; width:1px; height:1px; overflow:hidden; }
+  .skip:focus { left:1rem; top:1rem; width:auto; height:auto; padding:.5rem .7rem;
+                background:#fff; border:2px solid var(--accent); border-radius:4px; z-index:1; }
+  /* Source-reference chips: .vsc = local VS Code, .gh = portable GitHub permalink */
+  .vsc { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.72rem;
+         text-decoration:none; background:#eef1f4; border:1px solid #cfe0e8;
+         border-radius:4px; padding:.08em .45em; white-space:nowrap; color:var(--accent); }
+  .vsc:hover { background:#dbe7ef; }
+  .gh { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.7rem;
+        text-decoration:none; background:#1a1a1a; color:#f4f1e8;
+        border-radius:4px; padding:.08em .4em; white-space:nowrap; }
+  .gh:hover { background:#333; }
+  .srcline { margin:.35rem 0 0; font-size:.78rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<a class="skip" href="#lesson-main">Skip to lesson content</a>
+<main id="lesson-main">
+
+<h1>LESSON HEADLINE — the one idea</h1>
+<p class="sub">Lesson N · PR #NNNNN · one-line framing tied to the mission</p>
+
+<p>Open with the concrete problem this lesson resolves. Keep it short — one win.</p>
+
+<h2>A section</h2>
+<figure>
+  <figcaption>Diff showing the one important change.</figcaption>
+  <p class="listen"><b>Listen first:</b> this snippet removes the old line and adds the new line. When listening, focus on the intent: the deleted line is the behaviour being replaced; the added line is the behaviour to remember.</p>
+  <pre aria-hidden="true"><span class="del">- removed line</span>
+<span class="add">+ added line</span></pre>
+</figure>
+<!-- Source chips: BOTH links, same line. Re-grep the line number at the SHA first. -->
+<p class="srcline">Source (local · remote):
+  <a class="vsc" href="vscode://file/ABS/PATH/file.ext:NN" aria-label="Open local source file.ext line NN in VS Code">file.ext:NN</a>
+  <a class="gh" href="https://github.com/OWNER/REPO/blob/COMMIT_SHA/repo/rel/path.ext#LNN" aria-label="Open pinned GitHub source for file.ext line NN">GitHub↗</a></p>
+
+<blockquote>A reviewer's likely objection, and the crisp rebuttal.</blockquote>
+
+<div class="defense">
+<b>Cold-recall defense (one breath):</b><br>
+The single thing to be able to say in review without hesitating. Inline
+<code>code</code> here stays legible because of the <code>.defense code</code> rule.
+</div>
+
+<h2>Read next</h2>
+<ul>
+  <li><a href="000M-prev.html">← previous lesson</a></li>
+  <li><a href="../reference/architecture-map.html">Architecture map</a></li>
+  <li><a href="000P-next.html">next lesson →</a></li>
+</ul>
+
+<h2>Primary source</h2>
+<p>The single highest-quality external source for this topic, with a ~N-min read estimate.</p>
+
+<p class="ask">💬 I'm your teacher for this — ask me followups any time.</p>
+
+<p class="foot">Lesson N of M · workspace teach/pr-NNNNN · mission: …</p>
+</main>
+</body>
+</html>
