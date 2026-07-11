@@ -45,6 +45,7 @@ def recommend_cmd(
     project: Path = typer.Argument(..., help="BGCFlow project directory."),
     intent: str = typer.Option(..., "--intent", "-i", help="Analysis intent: enrichment|diversity|ordination|clustering|comparison|network_structure|sq1_inventory|sq2_novelty|sq3_prioritization|sq4_distribution|sq5_diversity|sq6_genomic_context|sq7_association"),
     topic: str = typer.Option("BGC analysis", "--topic", "-t", help="Research question (free text, used for literature ranking)."),
+    objective: Optional[str] = typer.Option(None, "--objective", help='Ranking objective, e.g. "manufacturability" to rank by ease of heterologous production.'),
     no_literature: bool = typer.Option(False, "--no-literature", help="Skip literature ranking (faster)."),
 ) -> None:
     """Show method recommendations for the given intent and topic."""
@@ -53,7 +54,7 @@ def recommend_cmd(
 
     try:
         proj = open_project(project)
-        request = AnalysisRequest(topic=topic, intent=Intent(intent))
+        request = AnalysisRequest(topic=topic, intent=Intent(intent), objective=objective)
         validation, recs = recommend(proj, request, use_literature=not no_literature)
     except (ValueError, KeyError) as e:
         console.print(f"[red]✖ {e}[/red]")
@@ -83,6 +84,23 @@ def recommend_cmd(
         )
 
     console.print(table)
+
+    if objective and recs and recs[0].alternatives:
+        manu = next((a for a in recs[0].alternatives if a.get("objective") == "manufacturability"), None)
+        if manu is not None:
+            from rich.panel import Panel
+
+            blockers = manu.get("blockers") or manu.get("notes") or []
+            lines = [
+                f"[bold]Tractability:[/] {manu.get('tractability_score', 0):.3f}",
+                f"[bold]Top class:[/] {manu.get('top_class') or '—'}",
+                f"[bold]Chassis hint:[/] {manu.get('chassis_hint') or '—'}",
+            ]
+            if blockers:
+                lines.append("[bold]Blockers:[/] " + "; ".join(str(b) for b in blockers))
+            else:
+                lines.append("[bold]Blockers:[/] none")
+            console.print(Panel("\n".join(lines), title="Manufacturability ranking", border_style="cyan", box=box.ROUNDED))
 
 
 @app.command("run")

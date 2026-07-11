@@ -32,7 +32,13 @@ class RunRecord(BaseModel):
 
     def save(self, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
-        out = output_dir / f"bgclens_run_{self.inputs_hash[:8]}.yaml"
+        # Filesystem/URL-safe, high-entropy stem unique per (project, method, time).
+        # inputs_hash is "sha256:<hex>", so slicing it directly would keep the
+        # colon-prefixed label and almost no entropy; hash the full run identity
+        # instead so distinct methods/runs never collide on one filename.
+        seed = f"{self.inputs_hash}|{self.run_spec}|{self.created_at}"
+        digest = hashlib.sha256(seed.encode()).hexdigest()[:12]
+        out = output_dir / f"bgclens_run_{digest}.yaml"
         out.write_text(self.to_yaml())
         return out
 

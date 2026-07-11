@@ -36,6 +36,24 @@ def test_evaluate_pcoa_red_empty_coords():
     assert vr.passed < vr.total
 
 
+def test_evaluate_alpha_diversity_runs_checks():
+    """Catalog method id 'alpha_diversity' must resolve validators (not default amber)."""
+    result = {"diversity_scores": {"shannon": 2.1, "simpson": 0.8}}
+    vr = evaluate("alpha_diversity", result)
+    assert vr.total > 0
+    assert vr.confidence_band == "green"
+    assert vr.passed == vr.total
+
+
+def test_evaluate_hierarchical_clustering_runs_checks():
+    """Catalog method id 'hierarchical_clustering' must resolve validators (not default amber)."""
+    result = {"labels": [0, 1, 0, 2]}
+    vr = evaluate("hierarchical_clustering", result)
+    assert vr.total > 0
+    assert vr.confidence_band == "green"
+    assert vr.passed == vr.total
+
+
 def test_evaluate_unknown_method_returns_amber():
     vr = evaluate("nonexistent_method", {})
     assert vr.confidence_band == "amber"

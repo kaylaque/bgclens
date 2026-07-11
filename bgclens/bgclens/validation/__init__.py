@@ -13,9 +13,9 @@ from bgclens.validation.tests.permanova import VALIDATORS as _PERMANOVA
 _METHOD_VALIDATORS: dict[str, list] = {
     "pcoa": _ORDINATION,
     "pca": _ORDINATION,
-    "diversity": _DIVERSITY,
+    "alpha_diversity": _DIVERSITY,
     "fisher_enrichment": _ENRICHMENT,
-    "clustering": _CLUSTERING,
+    "hierarchical_clustering": _CLUSTERING,
     "louvain_community": _CLUSTERING,
     "permanova": _PERMANOVA,
 }

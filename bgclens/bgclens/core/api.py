@@ -184,13 +184,15 @@ def recommend(
     if getattr(request, "objective", None) == "manufacturability":
         from bgclens.manufacturability import compute_features, compute_profile, reorder_for_manufacturability
         features = compute_features(project)
-        profile = compute_profile(features)
+        profile = compute_profile(features, project.taxonomy)
         recommendations = reorder_for_manufacturability(recommendations, profile)
         if recommendations:
             recommendations[0].alternatives.append({
                 "objective": "manufacturability",
                 "tractability_score": profile.tractability_score,
                 "top_class": profile.top_class,
+                "chassis_hint": profile.chassis_hint,
+                "blockers": profile.blockers,
                 "notes": profile.notes,
             })
 

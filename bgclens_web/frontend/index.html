@@ -85,6 +85,34 @@
   .flex-gap { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 
   .llm-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; background: #f3e8ff; color: #7c3aed; border-radius: 999px; font-weight: 600; }
+
+  .toggle-row { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; margin-bottom: 0.4rem; }
+  .toggle-btn { background: white; color: #475569; border: none; border-radius: 0; padding: 0.5rem 1.1rem; font-weight: 600; }
+  .toggle-btn + .toggle-btn { border-left: 1px solid #cbd5e1; }
+  .toggle-btn.selected { background: #2563eb; color: white; }
+
+  .check-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 500; color: #475569; cursor: pointer; }
+  .check-row input { width: auto; margin: 0; cursor: pointer; }
+
+  .intent-group { margin-bottom: 1rem; }
+  .intent-group-heading { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #64748b; margin: 0.75rem 0 0.5rem; }
+
+  .manuf-panel { border: 2px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.25rem; }
+  .manuf-title { font-weight: 700; color: #3730a3; margin-bottom: 0.6rem; }
+  .manuf-row { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.85rem; padding: 0.3rem 0; flex-wrap: wrap; }
+  .manuf-key { flex: 0 0 100px; font-weight: 600; color: #475569; }
+  .manuf-bar { height: 0.55rem; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-bottom: 0.2rem; }
+  .manuf-bar-fill { height: 100%; border-radius: 999px; }
+  .manuf-score { font-size: 0.8rem; font-weight: 700; color: #334155; }
+  .manuf-list { margin: 0; padding-left: 1.2rem; }
+  .manuf-list li { font-size: 0.82rem; color: #92400e; }
+  .manuf-note { font-size: 0.8rem; color: #475569; background: #ffffff; border: 1px dashed #c7d2fe; border-radius: 8px; padding: 0.5rem 0.7rem; margin-top: 0.5rem; line-height: 1.5; }
+
+  .validation-band { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.9rem 1rem; margin: 1rem 0; background: #f8fafc; }
+  .check-list { list-style: none; padding: 0; margin: 0; }
+  .check-list li { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.82rem; padding: 0.2rem 0; color: #334155; }
+  .check-pass { color: #15803d; font-weight: 700; }
+  .check-fail { color: #b91c1c; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -115,9 +143,24 @@
   <!-- Step 2: Intent + Topic -->
   <div class="card hidden" id="step-intent">
     <h2><span class="step-num">2</span> What do you want to analyse?</h2>
-    <div class="intent-grid" id="intent-grid"></div>
+
+    <label>Objective</label>
+    <div class="toggle-row" id="objective-toggle">
+      <button type="button" class="toggle-btn selected" data-objective="discovery" onclick="selectObjective('discovery')">Discovery</button>
+      <button type="button" class="toggle-btn" data-objective="manufacturability" onclick="selectObjective('manufacturability')">Manufacturability</button>
+    </div>
+    <div class="intent-desc" style="margin-bottom:1rem">Discovery ranks by novelty &amp; diversity. Manufacturability adds a chassis-tractability read on top of your results.</div>
+
+    <div id="intent-groups"></div>
+
     <label for="topic-input" style="margin-top:1rem">Describe your research question (used to find relevant literature)</label>
     <textarea id="topic-input" rows="2" placeholder="e.g. Which BGC classes are enriched in the Streptomyces clade compared to Saccharopolyspora?"></textarea>
+
+    <label class="check-row mt">
+      <input type="checkbox" id="use-literature" onchange="state.useLiterature = this.checked">
+      <span>Include published precedent (literature)</span>
+    </label>
+
     <div class="mt">
       <button class="btn-primary" id="btn-recommend" onclick="getRecommendations()">Get Method Recommendations</button>
     </div>
@@ -149,8 +192,11 @@ let state = {
   manifest: null,
   intents: [],
   selectedIntent: null,
+  objective: 'discovery',        // 'discovery' | 'manufacturability'
+  useLiterature: false,
   recommendations: [],
   selectedMethod: null,
+  lastRun: null,
 };
 
 // ── API helpers ──────────────────────────────────────────────────────────────
@@ -190,11 +236,17 @@ async function loadProject() {
 
 function showManifest(m) {
   const grid = document.getElementById('manifest-grid');
+  const yesNo = (v) => v
+    ? '<span class="badge badge-safe">yes</span>'
+    : '<span class="badge badge-lit-none">no</span>';
   grid.innerHTML = [
     ['Project', m.project_name],
     ['Genomes', m.genome_count],
     ['GCFs', m.gcf_count],
     ['Pipelines', m.available_pipelines.join(', ') || 'none'],
+    ['Counts', yesNo(m.has_counts)],
+    ['Taxonomy', yesNo(m.has_taxonomy)],
+    ['Network', yesNo(m.has_network)],
   ].map(([l, v]) => `<div class="manifest-item"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
   show('manifest-panel');
 }
@@ -203,19 +255,43 @@ function showManifest(m) {
 async function loadIntents() {
   const data = await api('GET', '/api/intents');
   state.intents = data.intents;
-  const grid = document.getElementById('intent-grid');
-  grid.innerHTML = data.intents.map(i => `
-    <label class="intent-card" onclick="selectIntent('${i.value}', this)">
-      <input type="radio" name="intent" value="${i.value}">
-      <div class="intent-label">${i.label}</div>
-      <div class="intent-desc">${i.description}</div>
-    </label>`).join('');
+  const container = document.getElementById('intent-groups');
+
+  // Preserve declared order, but bucket by `group`.
+  const order = ['Analytical', 'Research questions'];
+  const groups = {};
+  data.intents.forEach(i => {
+    const g = i.group || 'Analytical';
+    (groups[g] = groups[g] || []).push(i);
+  });
+  const groupNames = order.filter(g => groups[g]).concat(
+    Object.keys(groups).filter(g => !order.includes(g))
+  );
+
+  container.innerHTML = groupNames.map(g => `
+    <div class="intent-group">
+      <div class="intent-group-heading">${g}</div>
+      <div class="intent-grid">
+        ${groups[g].map(i => `
+          <label class="intent-card" onclick="selectIntent('${i.value}', this)">
+            <input type="radio" name="intent" value="${i.value}">
+            <div class="intent-label">${i.label}</div>
+            <div class="intent-desc">${i.description}</div>
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
 }
 
 function selectIntent(value, el) {
   document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   state.selectedIntent = value;
+}
+
+function selectObjective(value) {
+  state.objective = value;
+  document.querySelectorAll('#objective-toggle .toggle-btn').forEach(b =>
+    b.classList.toggle('selected', b.dataset.objective === value));
 }
 
 async function getRecommendations() {
@@ -232,7 +308,8 @@ async function getRecommendations() {
       path: state.projectPath,
       intent: state.selectedIntent,
       topic,
-      use_literature: false,
+      use_literature: state.useLiterature,
+      objective: state.objective === 'manufacturability' ? 'manufacturability' : null,
     });
 
     if (!data.valid) {
@@ -254,7 +331,8 @@ async function getRecommendations() {
 // ── Step 3: Methods ──────────────────────────────────────────────────────────
 function renderMethods(recs) {
   const list = document.getElementById('method-list');
-  list.innerHTML = recs.map(r => {
+  const manufPanel = renderManufacturability(recs);
+  list.innerHTML = manufPanel + recs.map(r => {
     const costClass = {'Safe':'badge-safe','Heavy':'badge-heavy','Likely-to-fail':'badge-fail'}[r.cost_class] || 'badge-safe';
     const litClass = {'strong':'badge-lit-strong','moderate':'badge-lit-moderate','weak':'badge-lit-none'}[r.literature_support] || 'badge-lit-none';
     const litLabel = r.literature_support === 'unknown' ? '' : `Literature: ${r.literature_support}`;
@@ -282,6 +360,47 @@ function selectMethod(methodId) {
   if (card) card.classList.add('selected');
 }
 
+function renderManufacturability(recs) {
+  if (state.objective !== 'manufacturability') return '';
+  const alts = (recs && recs[0] && recs[0].alternatives) || [];
+  const m = alts.find(a => a && a.objective === 'manufacturability');
+  if (!m) return '';
+
+  const score = typeof m.tractability_score === 'number' ? m.tractability_score : 0;
+  const pct = Math.max(0, Math.min(1, score)) * 100;
+  const scoreColor = score >= 0.66 ? '#16a34a' : score >= 0.33 ? '#a16207' : '#b91c1c';
+
+  const chassis = m.chassis_hint
+    ? `<div class="manuf-row"><span class="manuf-key">Chassis hint</span>
+         <span><strong>${m.chassis_hint.organism || '—'}</strong>${m.chassis_hint.reason ? ` — ${m.chassis_hint.reason}` : ''}</span></div>`
+    : `<div class="manuf-row"><span class="manuf-key">Chassis hint</span><span class="intent-desc">unavailable (taxonomy/class missing)</span></div>`;
+
+  const blockers = (m.blockers && m.blockers.length)
+    ? `<div class="manuf-row"><span class="manuf-key">Blockers</span>
+         <ul class="manuf-list">${m.blockers.map(b => `<li>&#9888; ${b}</li>`).join('')}</ul></div>`
+    : `<div class="manuf-row"><span class="manuf-key">Blockers</span><span class="intent-desc">none flagged</span></div>`;
+
+  const notes = (m.notes && m.notes.length)
+    ? `<div class="manuf-note">${m.notes.map(n => `<div>&#9432; ${n}</div>`).join('')}</div>`
+    : '';
+
+  return `
+    <div class="manuf-panel">
+      <div class="manuf-title">Manufacturability</div>
+      <div class="manuf-row">
+        <span class="manuf-key">Tractability</span>
+        <span style="flex:1;min-width:160px">
+          <div class="manuf-bar"><div class="manuf-bar-fill" style="width:${pct}%;background:${scoreColor}"></div></div>
+          <span class="manuf-score">${score.toFixed(2)}</span>
+        </span>
+      </div>
+      <div class="manuf-row"><span class="manuf-key">Top class</span><span><strong>${m.top_class || '—'}</strong></span></div>
+      ${chassis}
+      ${blockers}
+      ${notes}
+    </div>`;
+}
+
 // ── Step 4: Run ──────────────────────────────────────────────────────────────
 async function runAnalysis() {
   if (!state.selectedMethod) return showError('method-error', 'Please select a method.');
@@ -298,6 +417,7 @@ async function runAnalysis() {
       params: {},
       use_llm: true,
     });
+    state.lastRun = data;
     renderResult(data);
     show('step-result');
     document.getElementById('step-result').scrollIntoView({ behavior: 'smooth' });
@@ -337,17 +457,87 @@ function renderResult(data) {
     svgHref ? `<a href="${svgHref}" download="bgclens_figure.svg"><button class="btn-download" style="background:#0369a1">&#11015; SVG</button></a>` : '',
   ].join('');
 
+  const validationHtml = renderValidationBand(data);
+
+  const reportBtn = data.run_id
+    ? `<button class="btn-primary mt" id="btn-report" onclick="generateReport()">&#128196; Generate Report</button>
+       <div id="report-output"></div>`
+    : '';
+
   document.getElementById('result-content').innerHTML = `
     ${warnings}
     ${figureHtml}
     <div class="download-row">${downloadBtns}</div>
+    ${validationHtml}
     <div class="result-section">
       <div class="flex-gap" style="margin-bottom:0.75rem">
         <strong>Interpretation</strong> ${llmBadge}
       </div>
       <div class="interpretation">${interpretation}</div>
     </div>
+    ${reportBtn}
   `;
+}
+
+function renderValidationBand(data) {
+  const band = data.confidence_band;
+  const checks = data.validation_checks || [];
+  if (!band && !checks.length) return '';
+
+  const bandMap = {
+    green: { cls: 'badge-safe',  label: 'Green — validated' },
+    amber: { cls: 'badge-heavy', label: 'Amber — proceed with caution' },
+    red:   { cls: 'badge-fail',  label: 'Red — likely unreliable' },
+  };
+  const b = bandMap[band];
+  const bandBadge = b
+    ? `<span class="badge ${b.cls}">Confidence: ${b.label}</span>`
+    : '<span class="badge badge-lit-none">Confidence: unknown</span>';
+
+  const checklist = checks.length
+    ? `<ul class="check-list">${checks.map(c => `
+         <li>
+           <span class="${c.passed ? 'check-pass' : 'check-fail'}">${c.passed ? '&#10003;' : '&#10007;'}</span>
+           <span><strong>${c.name}</strong>${c.detail ? ` — ${c.detail}` : ''}</span>
+         </li>`).join('')}</ul>`
+    : '';
+
+  return `
+    <div class="validation-band">
+      <div class="flex-gap" style="margin-bottom:0.5rem"><strong>Validation confidence</strong> ${bandBadge}</div>
+      ${checklist}
+    </div>`;
+}
+
+async function generateReport() {
+  const btn = document.getElementById('btn-report');
+  const out = document.getElementById('report-output');
+  if (!state.lastRun || !state.lastRun.run_id) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating report&hellip;';
+
+  try {
+    const data = await api('POST', '/api/report', { run_id: state.lastRun.run_id });
+    if (data.html_b64) {
+      const href = `data:text/html;base64,${data.html_b64}`;
+      out.innerHTML = `
+        <div class="alert alert-info">Report rendered.</div>
+        <div class="download-row">
+          <a href="${href}" download="bgclens_report.html"><button class="btn-download">&#11015; Download HTML report</button></a>
+          <a href="${href}" target="_blank" rel="noopener"><button class="btn-secondary">Open in new tab</button></a>
+        </div>`;
+    } else {
+      out.innerHTML = `
+        <div class="alert alert-warn">Quarto isn't installed, so the HTML report couldn't be rendered.
+          The Quarto source was written to:<br><code>${data.qmd_path || 'unknown'}</code></div>`;
+    }
+  } catch(e) {
+    out.innerHTML = `<div class="alert alert-error">&#10007; ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#128196; Generate Report';
+  }
 }
 
 // ── Simple Markdown renderer ─────────────────────────────────────────────────
