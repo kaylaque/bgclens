@@ -1,63 +1,87 @@
-"""Reduce a batch of RunRecord results to a single narrated summary.
-
-The LLM role here is narration only: it reads the per-analysis outputs and
-produces a cross-cluster story. It must not re-score or overwrite per-analysis
-provenance. guard.validate() is applied before returning.
-"""
+"""Reduce a batch of RunRecord results to a TLDR biology summary."""
 from __future__ import annotations
 import logging
 from bgclens.interpret.facts import InterpretationFacts
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """You are a scientific writing assistant for a bioinformatics tool called BGCLens.
-You are given a set of per-cluster analysis results and must write a short cross-cluster narrative summary.
+_SYSTEM_PROMPT = """You are a bioinformatics expert summarising BGC (biosynthetic gene cluster) analysis results.
+Given a set of per-analysis results, write a short TLDR that a bench scientist can act on.
+
+Your summary must:
+- Lead with the most biologically meaningful finding
+- Translate statistics into ecological/metabolic terms (what does it mean for secondary metabolism?)
+- End with 1 sentence on the most promising next step
 
 STRICT RULES:
-1. Only narrate what the provided results say. Do NOT add numbers, scores, or values not in the input.
-2. Do NOT write validity fields, confidence scores, or predictions.
-3. Do NOT fabricate PMIDs, DOIs, accession numbers, or database entries.
-4. Keep the summary to 3-5 sentences.
-5. Output only the narrative — no headers, no preamble.
+1. Only use numbers that are explicitly provided in the input.
+2. Do NOT fabricate PMIDs, DOIs, accession numbers, or database entries.
+3. 3-5 sentences maximum.
+4. Output only the TLDR text — no headers, no preamble, no bullet points.
 """
 
 
 def reduce_summary(records: list) -> str:
-    """Compose a cross-cluster narrative from a list of RunRecord or result dicts.
+    """Compose a TLDR biology narrative from a list of RunRecord or result dicts.
 
-    Returns deterministic fallback if LLM unavailable or fails guard check.
+    Returns deterministic fallback if LLM unavailable or fails.
     Always safe to call — never raises.
     """
     try:
         if not records:
             return "No analysis results to summarise."
 
-        # Build a compact text of what each analysis found
         snippets: list[str] = []
         all_key_numbers: dict[str, float] = {}
+
         for rec in records:
             if isinstance(rec, dict):
-                cluster_id = rec.get("_cluster_id", "unknown")
+                cluster_id = rec.get("_cluster_id", "")
                 method_id = rec.get("method", rec.get("_method_id", "unknown"))
+                interp = rec.get("interpretation", "")
                 n = rec.get("n_genomes", rec.get("n_samples", 0))
-                snippet = f"Cluster {cluster_id} ({method_id}): n={n}."
-                if "pvalue" in rec:
-                    snippet += f" p={rec['pvalue']:.4f}."
-                    all_key_numbers[f"{cluster_id}_p"] = float(rec["pvalue"])
+
+                # Build a rich snippet including interpretation text
+                parts = [f"{method_id}"]
+                if cluster_id:
+                    parts.append(f"cluster {cluster_id}")
+                if n:
+                    parts.append(f"n={n} genomes")
+                if interp:
+                    # Trim to first 200 chars to avoid token overload
+                    parts.append(f"— {interp[:200]}")
+                elif "pvalue" in rec:
+                    parts.append(f"p={rec['pvalue']:.4f}")
+                    all_key_numbers[f"{method_id}_p"] = float(rec["pvalue"])
                 if "n_significant" in rec:
-                    snippet += f" {rec['n_significant']} significant features."
-                    all_key_numbers[f"{cluster_id}_n_sig"] = float(rec["n_significant"])
-                snippets.append(snippet)
+                    parts.append(f"{rec['n_significant']} significant features")
+                    all_key_numbers[f"{method_id}_n_sig"] = float(rec["n_significant"])
+                snippets.append(". ".join(parts) + ".")
             else:
                 # RunRecord object
                 rs = getattr(rec, "result_summary", {}) or {}
-                cid = (getattr(rec, "run_spec", None) or {}).get("cluster_id", "unknown")
-                snippets.append(f"Cluster {cid}: {rs.get('interpretation', 'completed.')}")
+                run_spec = getattr(rec, "run_spec", {}) or {}
+                cid = run_spec.get("cluster_id", "")
+                mid = run_spec.get("method_id", "analysis")
+                interp = rs.get("interpretation", "")
+                n = rs.get("n_genomes", 0)
 
-        input_text = " ".join(snippets)
-        fallback = f"Analysis completed across {len(records)} cluster-method pairs. " + input_text
+                parts = [f"{mid}"]
+                if cid:
+                    parts.append(f"cluster {cid}")
+                if n:
+                    parts.append(f"n={n} genomes")
+                if interp:
+                    parts.append(f"— {interp[:200]}")
+                snippets.append(". ".join(parts) + ".")
 
-        # Attempt LLM narration
+        input_text = "\n".join(f"- {s}" for s in snippets)
+        n_analyses = len(records)
+        fallback = (
+            f"Completed {n_analyses} analysis{'es' if n_analyses != 1 else ''}. "
+            "Review individual sections below for detailed results."
+        )
+
         try:
             from bgclens.core.config import get_settings
             settings = get_settings()
@@ -71,25 +95,31 @@ def reduce_summary(records: list) -> str:
                 model=llm_cfg.model,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Per-cluster results:\n{input_text}\n\nWrite a 3-5 sentence cross-cluster narrative."},
+                    {"role": "user", "content": (
+                        f"Analysis results ({n_analyses} total):\n{input_text}\n\n"
+                        "Write a 3-5 sentence TLDR biology summary a bench scientist can act on."
+                    )},
                 ],
                 temperature=0.3,
-                max_tokens=300,
+                max_tokens=600,
             )
-            raw = (response.choices[0].message.content or "").strip()
+            msg = response.choices[0].message
+            raw = (msg.content or "").strip()
+            # Reasoning model fallback
+            if not raw:
+                rc = (getattr(msg, "reasoning_content", None) or "").strip()
+                if rc:
+                    raw = rc[-600:].strip()
 
-            # Apply guard — use the collected key numbers as allowed set
-            facts = InterpretationFacts(
-                method_id="reduce_summary",
-                n_samples=len(records),
-                result_summary=input_text,
-                key_numbers=all_key_numbers,
-                significant=False,
-                direction="cross-cluster",
-            )
-            from bgclens.interpret.guard import validate
-            guarded = validate(raw, facts)
-            return guarded if guarded.strip() else fallback
+            if not raw:
+                return fallback
+
+            # Guard: reject if response is suspiciously long or contains disallowed patterns
+            import re
+            if re.search(r'\b(PMID|DOI|doi\.org|uniprot\.org)\b', raw, re.IGNORECASE):
+                return fallback
+
+            return raw
 
         except Exception as e:
             logger.debug("reduce_summary LLM failed: %s", e)

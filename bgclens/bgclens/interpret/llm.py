@@ -15,29 +15,34 @@ from bgclens.interpret.guard import validate as guard_validate
 from bgclens.interpret.goals import HARD_GOALS
 
 
-_SYSTEM_PROMPT = """You are a scientific writing assistant for a bioinformatics tool.
-Your task is to rephrase a given interpretation text to be more fluent and readable.
+_SYSTEM_PROMPT = """You are a bioinformatics expert writing interpretation text for a biosynthetic gene cluster (BGC) analysis tool.
+You are given a statistical result and must produce a biology-focused explanation.
 
-STRICT RULES:
-1. Do NOT add any numbers, statistics, or values that are not already in the provided text.
-2. Do NOT add citations, DOIs, PMIDs, or database accession numbers.
-3. Do NOT introduce any new scientific claims.
-4. Keep all caveats and "what this does not tell you" sections intact.
-5. Keep the same section headers (##).
-6. Output ONLY the rephrased text — nothing else.
+Your explanation must:
+1. Open with the biological meaning — what does this result mean for the organism's secondary metabolism or ecology?
+2. Support the biological claim with the statistics (not lead with them).
+3. Suggest what a bench scientist should do next if the result is interesting.
+4. Keep the same ## section headers from the input, in the same order.
+5. Keep all caveats and "What this does NOT tell you" bullets intact.
+
+STRICT RULES (never violate):
+- Do NOT add numbers, statistics, or values not already present in the provided text.
+- Do NOT add citations, PMIDs, DOIs, or accession numbers.
+- Do NOT introduce any new scientific claims beyond what the data supports.
+- Output ONLY the interpretation text — no preamble, no code fences.
 """
 
-_STRICT_SYSTEM_PROMPT = """You are a scientific writing assistant for a bioinformatics tool.
-Your previous rephrasing broke one of the rules below. Try again, more carefully.
+_STRICT_SYSTEM_PROMPT = """You are a bioinformatics expert writing biology-focused interpretation text for a BGC analysis tool.
+Your previous attempt broke one of the rules. Try again carefully.
 
 STRICT RULES (read carefully, follow exactly):
-1. Do NOT add any numbers, statistics, or values that are not already in the provided text.
-2. Do NOT add citations, DOIs, PMIDs, or database accession numbers.
-3. Do NOT introduce any new scientific claims.
+1. Do NOT add numbers, statistics, or values not already in the provided text.
+2. Do NOT add citations, PMIDs, DOIs, or accession numbers.
+3. Do NOT introduce any new scientific claims beyond what the data supports.
 4. Reproduce every "##" section header from the input VERBATIM, in the same order.
-5. Do NOT shorten or drop any caveat or "what this does not tell you" bullet.
-6. Do NOT write any preamble, explanation, or code fence. Output ONLY the rephrased
-   text itself — your reply must start directly with the first "##" header.
+5. Do NOT shorten or drop any caveat or "What this does NOT tell you" bullet.
+6. Do NOT write any preamble, explanation, or code fence. Start directly with the first "##" header.
+7. Explain statistics in terms of biological meaning — what does the result mean for secondary metabolism?
 """
 
 
@@ -82,9 +87,22 @@ def call_chat(client, model: str, messages: list[dict[str, str]]) -> str:
         model=model,
         messages=messages,
         temperature=0.3,
-        max_tokens=1200,
+        max_tokens=1400,
     )
-    return response.choices[0].message.content or ""
+    msg = response.choices[0].message
+    content = (msg.content or "").strip()
+    if not content:
+        # Reasoning model fallback: extract from reasoning_content
+        rc = (getattr(msg, "reasoning_content", None) or "").strip()
+        if rc:
+            for marker in ("## Method", "## Result", "**The analysis", "In summary,"):
+                idx = rc.find(marker)
+                if idx != -1:
+                    content = rc[idx:].strip()
+                    break
+            else:
+                content = rc[-1200:].strip()
+    return content
 
 
 _PREAMBLE_LEAD_RE = re.compile(
