@@ -3,9 +3,13 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolve .env relative to the package root (BGClens/bgclens/.env),
+# regardless of the working directory when the server is started.
+_ENV_FILE = Path(__file__).parents[2] / ".env"
+
 
 class LLMSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="BGCLENS_LLM_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="BGCLENS_LLM_", env_file=str(_ENV_FILE), extra="ignore")
 
     enabled: bool = False
     base_url: str = "https://api.openai.com/v1"
@@ -14,7 +18,7 @@ class LLMSettings(BaseSettings):
 
 
 class BGCLensSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="BGCLENS_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="BGCLENS_", env_file=str(_ENV_FILE), extra="ignore")
 
     cache_dir: Path = Path.home() / ".cache" / "bgclens"
     llm: LLMSettings = Field(default_factory=LLMSettings)
