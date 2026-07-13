@@ -32,3 +32,9 @@ def get_settings() -> BGCLensSettings:
     if _settings is None:
         _settings = BGCLensSettings()
     return _settings
+
+
+def reset_settings() -> None:
+    """Force reload from .env on next get_settings() call."""
+    global _settings
+    _settings = None
