@@ -463,7 +463,7 @@ def chat_cmd(
 @app.command("web")
 def web_cmd(
     host: str = typer.Option("127.0.0.1", help="Host to bind."),
-    port: int = typer.Option(8765, help="Port to bind."),
+    port: int = typer.Option(8766, help="Port to bind."),
     no_browser: bool = typer.Option(False, "--no-browser", help="Do not open browser automatically."),
 ) -> None:
     """Launch the BGCLens web UI and open a browser."""
@@ -474,7 +474,7 @@ def web_cmd(
     console.print(f"[bold green]Starting BGCLens web UI at {url}[/bold green]")
     if not no_browser:
         webbrowser.open(url)
-    uvicorn.run("bgclens_web.api.main:app", host=host, port=port, reload=False, log_level="warning")
+    uvicorn.run("bgclens_web.api.main:app", host=host, port=port, reload=False, log_level="info")
 
 
 if __name__ == "__main__":

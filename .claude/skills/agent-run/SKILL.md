@@ -27,7 +27,7 @@ If either fails: stop, fix, then restart this skill.
 ### 2. Start the web UI
 
 ```bash
-make web         # starts bgclens web at http://localhost:8765 --no-browser
+make web         # starts bgclens web at http://localhost:8766 --no-browser
 ```
 
 Run this in the background (use `run_in_background: true` in Bash tool).
@@ -38,25 +38,25 @@ Using the FastAPI endpoints (v2 flow: ingest → clusters → run-batch → lock
 
 ```bash
 # Check the app is up
-curl -s http://localhost:8765/api/health | python3 -m json.tool
+curl -s http://localhost:8766/api/health | python3 -m json.tool
 
 # Load project
-curl -s -X POST http://localhost:8765/api/open \
+curl -s -X POST http://localhost:8766/api/open \
   -H "Content-Type: application/json" \
   -d '{"path": "tests/fixtures/demo_project"}' | python3 -m json.tool | head -15
 
 # List clusters (v2 P1 cluster profile view)
-curl -s "http://localhost:8765/api/clusters?path=tests/fixtures/demo_project" \
+curl -s "http://localhost:8766/api/clusters?path=tests/fixtures/demo_project" \
   | python3 -m json.tool | head -30
 
 # Run batch (v2 per-cluster fan-out)
-curl -s -X POST http://localhost:8765/api/run-batch \
+curl -s -X POST http://localhost:8766/api/run-batch \
   -H "Content-Type: application/json" \
   -d '{"path": "tests/fixtures/demo_project", "method_ids": ["alpha_diversity"], "use_llm": false}' \
   | python3 -m json.tool | head -20
 
 # Chat (v2 grounded Q&A)
-curl -s -X POST http://localhost:8765/api/chat \
+curl -s -X POST http://localhost:8766/api/chat \
   -H "Content-Type: application/json" \
   -d '{"path": "tests/fixtures/demo_project", "message": "How many GCFs are in this project?"}' \
   | python3 -m json.tool
@@ -65,7 +65,7 @@ curl -s -X POST http://localhost:8765/api/chat \
 Legacy single-method flow (still works for backward-compat):
 
 ```bash
-curl -s "http://localhost:8765/api/recommend" \
+curl -s "http://localhost:8766/api/recommend" \
   -H "Content-Type: application/json" \
   -d '{"path": "tests/fixtures/demo_project", "intent": "diversity", "topic": "BGC diversity"}' \
   | python3 -m json.tool | head -20
