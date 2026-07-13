@@ -7,7 +7,7 @@ from typing import Any
 
 from bgclens.adapters.detect import detect_project
 from bgclens.adapters import csv_adapter, duckdb_adapter
-from bgclens.model import Project
+from bgclens.model import Project, Cluster
 from bgclens.core.intent import (
     AnalysisRequest, Intent, IntentValidation,
     validate_intent, filter_methods_for_intent,
@@ -228,6 +228,95 @@ def run(project: "Project", method_id: str, params: dict[str, Any] | None = None
     ]
 
     return result
+
+
+def run_cluster(
+    project: "Project",
+    cluster: "Cluster",
+    method_id: str,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute a method scoped to a single cluster.
+
+    Builds inputs filtered to this cluster's GCF id, then delegates to run().
+    Falls back to whole-project run() if per-cluster filtering is not possible.
+    """
+    from bgclens.model import Cluster as ClusterModel
+    # Narrow presence_absence to rows matching this cluster's gcf_id
+    pa = project.gcf_presence_absence
+    if pa and cluster.cluster_id in pa.rows:
+        idx = pa.rows.index(cluster.cluster_id)
+        from bgclens.model import PresenceAbsenceMatrix
+        narrow_pa = PresenceAbsenceMatrix(
+            rows=[cluster.cluster_id],
+            cols=pa.cols,
+            values=[pa.values[idx]],
+            row_meta=pa.row_meta,
+            col_meta=pa.col_meta,
+        )
+        from bgclens.model import Project as ProjectModel
+        narrow_project = project.model_copy(update={"gcf_presence_absence": narrow_pa})
+        result = run(narrow_project, method_id, params)
+    else:
+        result = run(project, method_id, params)
+    result["_cluster_id"] = cluster.cluster_id
+    return result
+
+
+async def run_batch(
+    project: "Project",
+    method_ids: list[str],
+    cluster_ids: list[str] | None = None,
+    use_llm: bool = True,
+) -> list[dict[str, Any]]:
+    """Run multiple methods across selected clusters in parallel.
+
+    Yields BatchEvent-like dicts as tasks complete.
+    Returns list of result dicts (one per cluster x method).
+    asyncio.gather provides the parallelism (multiple methods x multiple clusters).
+    """
+    import asyncio
+    from bgclens.core.clusters import list_clusters, select_smoke_clusters
+    from bgclens.model import Cluster
+
+    all_clusters = list_clusters(project)
+    if cluster_ids:
+        clusters = [c for c in all_clusters if c.cluster_id in set(cluster_ids)]
+    else:
+        clusters = select_smoke_clusters(all_clusters, n=3)
+
+    results: list[dict[str, Any]] = []
+
+    async def _run_one(cluster: Cluster, method_id: str) -> dict[str, Any]:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: run_cluster(project, cluster, method_id, None),
+        )
+        return result
+
+    tasks = [
+        _run_one(cluster, method_id)
+        for cluster in clusters
+        for method_id in method_ids
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Replace exceptions with error dicts
+    clean: list[dict[str, Any]] = []
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            cluster = clusters[i // len(method_ids)]
+            method_id = method_ids[i % len(method_ids)]
+            clean.append({
+                "_cluster_id": cluster.cluster_id,
+                "_method_id": method_id,
+                "_error": str(r),
+                "method": method_id,
+            })
+        else:
+            clean.append(r)
+    return clean
 
 
 def _build_inputs(project: "Project", method_entry: dict) -> dict:

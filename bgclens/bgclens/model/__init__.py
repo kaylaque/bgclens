@@ -92,3 +92,51 @@ class Project(BaseModel):
     quality: QualityTable | None = None
     gcf_network: NetworkEdgeList | None = None
     metadata: MetadataTable | None = None
+
+
+from typing import Literal
+
+
+class Cluster(BaseModel):
+    """A single BGC / GCF cluster profile extracted from a BGCFlow project."""
+    cluster_id: str
+    gcf_id: str | None = None
+    cluster_type: str = "unknown"  # NRPS, PKS, terpene, RiPP, hybrid, unknown
+    core_biosynthetic_genes: list[str] = Field(default_factory=list)
+    domains: list[str] = Field(default_factory=list)
+    organism: str | None = None
+    novelty_band: Literal["high", "medium", "low", "novel-candidate"] = "low"
+    novelty_distance: float | None = None  # nearest-neighbour distance if available
+    source_row: dict[str, Any] = Field(default_factory=dict)
+
+
+class BatchEvent(BaseModel):
+    """Live status update from run_batch()."""
+    task_id: str
+    cluster_id: str
+    method_id: str
+    state: Literal["queued", "running", "success", "failed"]
+    error: str | None = None
+
+
+class Turn(BaseModel):
+    """One turn in a multi-turn chat session."""
+    role: Literal["user", "assistant"]
+    content: str
+    mentions: list[str] = Field(default_factory=list)
+
+
+class Mention(BaseModel):
+    """A resolved @mention pointing at a Knowledge Base object."""
+    raw: str         # e.g. "@cluster_1"
+    object_id: str   # e.g. "cluster_1"
+    object_type: str  # "cluster" | "method" | "report_section" | "dataset"
+    context_snippet: str = ""  # deterministic text pulled from the KB object
+
+
+class BatchReport(BaseModel):
+    """Input to render_batch() — the full set of results from a run_batch call."""
+    project_name: str
+    records: list[Any]    # list[RunRecord] — Any to avoid circular import at model level
+    summary: str = ""
+    cluster_comparison: dict[str, Any] = Field(default_factory=dict)

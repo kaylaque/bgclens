@@ -32,28 +32,43 @@ make web         # starts bgclens web at http://localhost:8765 --no-browser
 
 Run this in the background (use `run_in_background: true` in Bash tool).
 
-### 3. Walk the four-step wizard
+### 3. Walk the v2 two-page flow
 
-Using WebFetch or by inspecting the response from the FastAPI endpoints:
+Using the FastAPI endpoints (v2 flow: ingest → clusters → run-batch → lock → chat):
 
 ```bash
 # Check the app is up
-curl -s http://localhost:8765/api/manifest | python3 -m json.tool | head -20
+curl -s http://localhost:8765/api/health | python3 -m json.tool
 
-# Check intents load
-curl -s http://localhost:8765/api/intents | python3 -m json.tool
+# Load project
+curl -s -X POST http://localhost:8765/api/open \
+  -H "Content-Type: application/json" \
+  -d '{"path": "tests/fixtures/demo_project"}' | python3 -m json.tool | head -15
 
-# Recommend a method
+# List clusters (v2 P1 cluster profile view)
+curl -s "http://localhost:8765/api/clusters?path=tests/fixtures/demo_project" \
+  | python3 -m json.tool | head -30
+
+# Run batch (v2 per-cluster fan-out)
+curl -s -X POST http://localhost:8765/api/run-batch \
+  -H "Content-Type: application/json" \
+  -d '{"path": "tests/fixtures/demo_project", "method_ids": ["alpha_diversity"], "use_llm": false}' \
+  | python3 -m json.tool | head -20
+
+# Chat (v2 grounded Q&A)
+curl -s -X POST http://localhost:8765/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"path": "tests/fixtures/demo_project", "message": "How many GCFs are in this project?"}' \
+  | python3 -m json.tool
+```
+
+Legacy single-method flow (still works for backward-compat):
+
+```bash
 curl -s "http://localhost:8765/api/recommend" \
   -H "Content-Type: application/json" \
-  -d '{"project_path": "tests/fixtures/demo_project", "intent": "diversity", "topic": "BGC diversity"}' \
-  | python3 -m json.tool | head -30
-
-# Run a method
-curl -s "http://localhost:8765/api/run" \
-  -H "Content-Type: application/json" \
-  -d '{"project_path": "tests/fixtures/demo_project", "method": "alpha_diversity"}' \
-  | python3 -m json.tool | head -30
+  -d '{"path": "tests/fixtures/demo_project", "intent": "diversity", "topic": "BGC diversity"}' \
+  | python3 -m json.tool | head -20
 ```
 
 ### 4. Verify the specific changed surface

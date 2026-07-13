@@ -220,6 +220,246 @@ def report_cmd(
         console.print(f"[yellow]ℹ {report.note}[/]")
 
 
+@app.command("clusters")
+def clusters_cmd(
+    project: Path = typer.Argument(..., help="BGCFlow project directory."),
+) -> None:
+    """List cluster profiles with banded confidence indicators."""
+    from bgclens.core.api import open_project
+    from bgclens.core.clusters import list_clusters
+
+    try:
+        proj = open_project(project)
+        clusters = list_clusters(proj)
+    except ValueError as e:
+        console.print(f"[red]✖ {e}[/red]")
+        raise typer.Exit(1)
+
+    if not clusters:
+        console.print("[yellow]No clusters found in this project.[/yellow]")
+        raise typer.Exit(0)
+
+    band_style = {
+        "high": "cyan",
+        "medium": "yellow",
+        "low": "white",
+        "novel-candidate": "magenta bold",
+    }
+
+    table = Table(box=box.ROUNDED, title=f"Cluster profiles — {proj.manifest.project_name} ({len(clusters)} GCFs)")
+    table.add_column("Cluster ID", style="bold")
+    table.add_column("Type")
+    table.add_column("Novelty band")
+    table.add_column("Organism")
+
+    for c in clusters:
+        style = band_style.get(c.novelty_band, "white")
+        table.add_row(
+            c.cluster_id,
+            c.cluster_type or "—",
+            f"[{style}]{c.novelty_band}[/{style}]",
+            c.organism or "—",
+        )
+
+    console.print(table)
+    console.print("[dim]Novelty bands are banded priors, not predictions of correctness.[/dim]")
+
+
+@app.command("run-batch")
+def run_batch_cmd(
+    project: Path = typer.Argument(..., help="BGCFlow project directory."),
+    methods: str = typer.Option("alpha_diversity,fisher_exact", "--methods", "-m",
+                                help="Comma-separated method IDs to run."),
+    clusters: Optional[str] = typer.Option(None, "--clusters", "-c",
+                                           help="Comma-separated cluster IDs, or 'auto' for smoke round (default 3)."),
+    use_llm: bool = typer.Option(True, "--use-llm/--no-llm", help="Enable LLM interpretation."),
+    output_dir: Optional[Path] = typer.Option(None, "--output", "-o", help="Directory for run records."),
+) -> None:
+    """Run multiple analyses across clusters in parallel (smoke round = 3 by default)."""
+    import asyncio
+    from bgclens.core.api import open_project, run_batch
+    from bgclens.core.provenance import RunRecord, hash_project
+
+    try:
+        proj = open_project(project)
+    except ValueError as e:
+        console.print(f"[red]✖ {e}[/red]")
+        raise typer.Exit(1)
+
+    method_ids = [m.strip() for m in methods.split(",") if m.strip()]
+    cluster_ids: Optional[list[str]] = None
+    if clusters and clusters.lower() != "auto":
+        cluster_ids = [c.strip() for c in clusters.split(",") if c.strip()]
+
+    console.print(f"[bold]Running batch:[/] {', '.join(method_ids)} on {proj.manifest.project_name}")
+    if cluster_ids:
+        console.print(f"[bold]Clusters:[/] {', '.join(cluster_ids)}")
+    else:
+        console.print("[bold]Clusters:[/] smoke round (auto, up to 3)")
+
+    try:
+        results = asyncio.run(run_batch(
+            proj,
+            method_ids=method_ids,
+            cluster_ids=cluster_ids,
+            use_llm=use_llm,
+        ))
+    except Exception as e:
+        console.print(f"[red]✖ Batch run failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    run_ids: list[str] = []
+    out = output_dir or Path(".bgclens_runs")
+    out.mkdir(parents=True, exist_ok=True)
+
+    for res in results:
+        cluster_id = res.get("_cluster_id", "")
+        method_id = res.get("method", res.get("_method_id", "unknown"))
+        error = res.get("_error")
+
+        if error:
+            console.print(f"[red]✗[/red] {method_id}@{cluster_id}: {error}")
+        else:
+            console.print(f"[green]✔[/green] {method_id}@{cluster_id}")
+            # Save run record
+            try:
+                record = RunRecord(
+                    project_path=str(project),
+                    inputs_hash=hash_project(project),
+                    run_spec={"method_id": method_id, "cluster_id": cluster_id, "params": {}},
+                    llm={"enabled": use_llm},
+                    result_summary={k: v for k, v in res.items()
+                                   if not k.startswith("_") and not isinstance(v, (list, dict))},
+                )
+                saved = record.save(out)
+                run_ids.append(saved.stem)
+            except Exception as save_err:
+                console.print(f"[yellow]⚠ Could not save run record: {save_err}[/yellow]")
+
+    console.print(f"\n[bold]Run IDs:[/] {' '.join(run_ids)}")
+    console.print(f"[dim]Use 'bgclens lock {' '.join(run_ids[:2])}...' to lock the report.[/dim]")
+
+
+@app.command("lock")
+def lock_cmd(
+    run_ids: list[str] = typer.Argument(..., help="Run IDs from 'bgclens run-batch'."),
+    rocrate: bool = typer.Option(False, "--rocrate/--no-rocrate", help="Wrap in RO-Crate archive."),
+    out_dir: Path = typer.Option(Path(".bgclens_runs/reports"), "--out", "-o", help="Output directory."),
+) -> None:
+    """Render a batch report, lock it (immutable), and optionally wrap in RO-Crate."""
+    from bgclens.core.provenance import RunRecord
+    from bgclens.model import BatchReport
+    from bgclens.interpret.reduce import reduce_summary
+    from bgclens.report.quarto import render_batch
+
+    records: list[RunRecord] = []
+    for run_id in run_ids:
+        stem = run_id if not run_id.endswith(".yaml") else run_id[:-5]
+        for search_dir in [Path(".bgclens_runs"), Path(".")]:
+            candidate = search_dir / f"{stem}.yaml"
+            if candidate.exists():
+                try:
+                    records.append(RunRecord.from_yaml(candidate.read_text()))
+                except Exception as e:
+                    console.print(f"[yellow]⚠ Could not load {candidate}: {e}[/yellow]")
+                break
+
+    if not records:
+        console.print("[red]✖ No valid run records found.[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Rendering batch report for {len(records)} run(s)…[/bold]")
+
+    # Build comparison dict
+    comparison = {}
+    for rec in records:
+        rs = rec.result_summary or {}
+        cid = (rec.run_spec or {}).get("cluster_id", "unknown")
+        mid = (rec.run_spec or {}).get("method_id", "unknown")
+        comparison[f"{mid}@{cid}"] = rs.get("interpretation", f"{mid} completed")
+
+    proj_name = Path(records[0].project_path).name
+    summary_text = reduce_summary([r.result_summary or {} for r in records])
+
+    batch = BatchReport(
+        project_name=proj_name,
+        records=records,
+        summary=summary_text,
+        cluster_comparison=comparison,
+    )
+
+    report = render_batch(batch, out_dir)
+    console.print(f"[green]✔ Report written:[/] {report.qmd_path}")
+
+    # Lock
+    if report.qmd_path and report.qmd_path.exists():
+        locked_path = records[0].lock(report.qmd_path)
+        console.print(f"[green]✔ Locked:[/] {locked_path} (immutable)")
+    else:
+        console.print("[yellow]⚠ Could not lock: report file not found.[/yellow]")
+        raise typer.Exit(1)
+
+    # RO-Crate
+    if rocrate:
+        try:
+            from bgclens.report.rocrate import wrap
+            crate = wrap(records[0], extra_files=[])
+            if crate:
+                console.print(f"[green]✔ RO-Crate:[/] {crate}")
+            else:
+                console.print("[yellow]⚠ RO-Crate wrap failed (non-fatal).[/yellow]")
+        except Exception as e:
+            console.print(f"[yellow]⚠ RO-Crate wrap error: {e}[/yellow]")
+
+    if report.html_path:
+        console.print(f"[green]✔ HTML:[/] {report.html_path}")
+
+
+@app.command("chat")
+def chat_cmd(
+    project: Path = typer.Argument(..., help="BGCFlow project directory."),
+    message: str = typer.Option(..., "--message", "-q", help="Question to ask."),
+    mention: Optional[str] = typer.Option(None, "--mention", help="@mention target (e.g. @gcf_001)."),
+    run_id: Optional[str] = typer.Option(None, "--run", help="Run record ID to include as context."),
+) -> None:
+    """Ask a question about the project (grounded in analysis results, no fabrication)."""
+    from bgclens.core.api import open_project
+    from bgclens.interpret.chat import chat
+    from bgclens.interpret.mentions import parse
+    from bgclens.model import Turn
+    from bgclens.core.provenance import RunRecord
+
+    try:
+        proj = open_project(project)
+    except ValueError as e:
+        console.print(f"[red]✖ {e}[/red]")
+        raise typer.Exit(1)
+
+    records: list[RunRecord] = []
+    if run_id:
+        stem = run_id if not run_id.endswith(".yaml") else run_id[:-5]
+        for search_dir in [Path(".bgclens_runs"), Path(".")]:
+            candidate = search_dir / f"{stem}.yaml"
+            if candidate.exists():
+                try:
+                    records.append(RunRecord.from_yaml(candidate.read_text()))
+                except Exception:
+                    pass
+                break
+
+    full_message = message
+    if mention:
+        full_message = f"{mention} {message}" if not message.startswith("@") else message
+
+    mentions = parse(full_message)
+    turn = chat(proj, records, [], full_message, mentions)
+
+    console.print(f"\n[bold blue]BGCLens:[/bold blue] {turn.content}")
+    if turn.mentions:
+        console.print(f"[dim]Context scoped to: {', '.join(turn.mentions)}[/dim]")
+    console.print("[dim]Answers grounded in retrieved data only. No fabrication.[/dim]")
+
+
 @app.command("web")
 def web_cmd(
     host: str = typer.Option("127.0.0.1", help="Host to bind."),

@@ -191,3 +191,120 @@ def render(run_record, out_dir: Path | str) -> QuartoReport:
             rendered=False,
             note=f"render error: {exc}",
         )
+
+
+def render_batch(batch_report, out_dir: Path | str) -> QuartoReport:
+    """Render a BatchReport (multi-cluster x multi-method) to a single composed QMD.
+
+    Emits: per-analysis blocks + cross-cluster comparison + top-level summary.
+    Returns QuartoReport. Never raises.
+    """
+    try:
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        project_name = getattr(batch_report, "project_name", "BGCLens")
+        records = getattr(batch_report, "records", []) or []
+        summary = getattr(batch_report, "summary", "") or ""
+        comparison = getattr(batch_report, "cluster_comparison", {}) or {}
+
+        # Build per-analysis blocks
+        analysis_blocks: list[str] = []
+        for rec in records:
+            rs = _safe_get(rec, "result_summary", {}) or {}
+            run_spec = _safe_get(rec, "run_spec", {}) or {}
+            method_id = run_spec.get("method_id", rs.get("method", "unknown")) if isinstance(run_spec, dict) else "unknown"
+            cluster_id = run_spec.get("cluster_id", rs.get("_cluster_id", "")) if isinstance(run_spec, dict) else ""
+            inputs_hash = _safe_get(rec, "inputs_hash", "") or ""
+            created_at = _safe_get(rec, "created_at", "") or ""
+            literature = _safe_get(rec, "literature", {}) or {}
+            badge = "precedent" if (literature and isinstance(literature, dict)) else "deterministic"
+
+            svg = rs.get("svg", "") if isinstance(rs, dict) else ""
+            viz = f"\n{svg}\n" if svg else ""
+            interp = rs.get("interpretation", "") if isinstance(rs, dict) else ""
+            interp_block = f"\n**Analysis insight:** {interp}\n" if interp else ""
+
+            provenance_json = json.dumps({
+                "method_id": method_id,
+                "cluster_id": cluster_id,
+                "inputs_hash": inputs_hash,
+                "created_at": created_at,
+            }, indent=2, default=str)
+
+            block = f"""
+## Analysis — {method_id}{' — ' + cluster_id if cluster_id else ''}
+
+**Method:** `{method_id}`  **Firewall badge:** `{badge}`
+{viz}{interp_block}
+**Reasoning:** This method was selected based on the analysis intent and available data.
+
+**Conclusion:** See interpretation above. Consult per-analysis provenance for reproducibility.
+
+### Provenance
+
+```json
+{provenance_json}
+```
+"""
+            analysis_blocks.append(block)
+
+        # Cross-cluster comparison table
+        comparison_block = ""
+        if comparison:
+            rows = "\n".join(
+                f"| {k} | {v} |" for k, v in comparison.items()
+            )
+            comparison_block = f"""
+## Cross-cluster comparison
+
+| Cluster | Summary |
+|---------|---------|
+{rows}
+"""
+
+        # Top-level summary
+        summary_block = f"\n# Summary\n\n{summary}\n" if summary else ""
+
+        qmd = f"""---
+title: "BGCLens Batch Report: {project_name}"
+execute:
+  freeze: auto
+---
+
+{summary_block}
+{''.join(analysis_blocks)}
+{comparison_block}
+"""
+
+        import hashlib as _hashlib
+        batch_hash = _hashlib.sha256(project_name.encode()).hexdigest()[:8]
+        qmd_path = out_dir / f"batch_report_{batch_hash}.qmd"
+        qmd_path.write_text(qmd)
+
+        quarto_bin = shutil.which("quarto")
+        if quarto_bin is None:
+            return QuartoReport(qmd_path=qmd_path, html_path=None, rendered=False, note="quarto not installed")
+
+        result = subprocess.run(
+            ["quarto", "render", str(qmd_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            return QuartoReport(qmd_path=qmd_path, html_path=None, rendered=False,
+                                note=f"quarto render failed: {result.stderr[:200]}")
+
+        html_path = qmd_path.with_suffix(".html")
+        return QuartoReport(
+            qmd_path=qmd_path,
+            html_path=html_path if html_path.exists() else None,
+            rendered=True,
+        )
+
+    except Exception as exc:
+        fallback = Path(out_dir) / "batch_report_error.qmd"
+        try:
+            fallback.write_text(f"---\ntitle: BGCLens Batch Report\nexecute:\n  freeze: auto\n---\n\n*Batch render error: {exc}*\n")
+        except Exception:
+            pass
+        return QuartoReport(qmd_path=fallback, html_path=None, rendered=False, note=f"batch render error: {exc}")

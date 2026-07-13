@@ -3,568 +3,565 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BGCLens — Post-Processing for BGCFlow</title>
+<title>BGCLens — v2 Dashboard</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f0f4f8; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-  header { background: #1e3a5f; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-  header h1 { font-size: 1.5rem; font-weight: 700; }
-  header span { opacity: 0.7; font-size: 0.9rem; }
+/* Header */
+header { background: #1e3a5f; color: white; padding: 0.6rem 1.2rem; display: flex; align-items: center; gap: 1rem; flex-shrink: 0; z-index: 10; }
+header h1 { font-size: 1.2rem; font-weight: 700; }
+.tab-bar { display: flex; gap: 0.25rem; margin-left: 1rem; }
+.tab { padding: 0.35rem 1rem; border-radius: 6px 6px 0 0; font-size: 0.82rem; font-weight: 600; cursor: pointer; color: rgba(255,255,255,0.7); border: none; background: transparent; }
+.tab.active { background: white; color: #1e3a5f; }
+.project-tag { margin-left: auto; font-size: 0.78rem; opacity: 0.7; }
 
-  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+/* Main layout */
+.app-body { display: grid; grid-template-columns: 220px 1fr 320px; flex: 1; overflow: hidden; gap: 0; }
 
-  .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
-  .card h2 { font-size: 1.1rem; font-weight: 600; color: #1e3a5f; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-  .step-num { background: #2563eb; color: white; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+/* Left KB panel */
+.kb-panel { background: #1a2d4a; color: #c8d6e5; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #0f1f30; }
+.kb-panel h2 { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.75rem 0.9rem 0.4rem; color: #7fa8c9; }
+.kb-list { overflow-y: auto; flex: 1; padding: 0 0.5rem 0.5rem; }
+.kb-item { padding: 0.35rem 0.5rem; border-radius: 5px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
+.kb-item:hover { background: rgba(255,255,255,0.07); }
+.kb-type { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+.kb-type-cluster { background: #1d4ed8; color: white; }
+.kb-type-method { background: #15803d; color: white; }
+.kb-type-report { background: #7e22ce; color: white; }
 
-  label { display: block; font-size: 0.875rem; font-weight: 500; color: #475569; margin-bottom: 0.4rem; }
-  input[type="text"], textarea { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; transition: border-color 0.15s; }
-  input[type="text"]:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+/* Centre */
+.centre { display: flex; flex-direction: column; overflow: hidden; }
+.page { display: none; flex-direction: column; flex: 1; overflow-y: auto; padding: 1rem 1.2rem; gap: 0.9rem; }
+.page.active { display: flex; }
 
-  button { padding: 0.6rem 1.4rem; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: #2563eb; color: white; }
-  .btn-primary:hover { background: #1d4ed8; }
-  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-  .btn-secondary { background: #f1f5f9; color: #475569; }
-  .btn-download { background: #16a34a; color: white; }
-  .btn-download:hover { background: #15803d; }
+/* Cards */
+.card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 1rem 1.2rem; }
+.card h3 { font-size: 0.9rem; font-weight: 600; color: #1e3a5f; margin-bottom: 0.7rem; display: flex; align-items: center; gap: 0.5rem; }
 
-  .badge { display: inline-flex; align-items: center; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-  .badge-safe { background: #dcfce7; color: #15803d; }
-  .badge-heavy { background: #fef9c3; color: #a16207; }
-  .badge-fail { background: #fee2e2; color: #b91c1c; }
-  .badge-lit-strong { background: #dbeafe; color: #1d4ed8; }
-  .badge-lit-moderate { background: #ede9fe; color: #6d28d9; }
-  .badge-lit-none { background: #f1f5f9; color: #64748b; }
+/* Inputs */
+.input-row { display: flex; gap: 0.5rem; }
+input[type="text"] { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.9rem; }
+input[type="text"]:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-success { background: #16a34a; color: white; }
+.btn-success:hover:not(:disabled) { background: #15803d; }
+.btn-success:disabled { background: #86efac; cursor: not-allowed; }
+.btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+.btn-lock { background: #7e22ce; color: white; }
+.btn-lock:hover { background: #6b21a8; }
 
-  .manifest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
-  .manifest-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; }
-  .manifest-item .label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.2rem; }
-  .manifest-item .value { font-size: 1.1rem; font-weight: 700; color: #1e3a5f; }
+/* Alerts */
+.alert { padding: 0.6rem 0.9rem; border-radius: 7px; font-size: 0.82rem; }
+.alert-error { background: #fee2e2; color: #991b1b; }
+.alert-info { background: #eff6ff; color: #1e40af; }
+.alert-warn { background: #fffbeb; color: #92400e; }
 
-  .intent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
-  .intent-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.9rem 1rem; cursor: pointer; transition: all 0.15s; }
-  .intent-card:hover { border-color: #93c5fd; background: #eff6ff; }
-  .intent-card.selected { border-color: #2563eb; background: #eff6ff; }
-  .intent-card input { display: none; }
-  .intent-card .intent-label { font-weight: 600; font-size: 0.9rem; color: #1e3a5f; }
-  .intent-card .intent-desc { font-size: 0.78rem; color: #64748b; margin-top: 0.2rem; }
+/* BGCFlow embed */
+.bgcflow-embed { width: 100%; height: 320px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.embed-placeholder { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2rem; text-align: center; color: #64748b; font-size: 0.85rem; }
 
-  .method-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.15s; }
-  .method-card:hover { border-color: #93c5fd; }
-  .method-card.selected { border-color: #2563eb; background: #eff6ff; }
-  .method-card.recommended { border-color: #16a34a; }
-  .method-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-  .method-name { font-weight: 600; font-size: 0.95rem; }
-  .rec-tag { background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
-  .warning-list { margin-top: 0.5rem; }
-  .warning-item { font-size: 0.78rem; color: #92400e; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 0.3rem 0.6rem; margin-top: 0.3rem; border-radius: 0 4px 4px 0; }
+/* Cluster profiles */
+.cluster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; }
+.cluster-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.7rem; cursor: pointer; transition: border-color 0.15s; }
+.cluster-card:hover { border-color: #93c5fd; }
+.cluster-id { font-size: 0.8rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.3rem; }
+.cluster-type { font-size: 0.72rem; color: #64748b; margin-bottom: 0.4rem; }
+.band-chip { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.band-high { background: #dbeafe; color: #1d4ed8; }
+.band-medium { background: #fef9c3; color: #a16207; }
+.band-low { background: #f1f5f9; color: #475569; }
+.band-novel-candidate { background: #f3e8ff; color: #7e22ce; }
 
-  .result-section { margin-top: 1rem; }
-  .figure-container { text-align: center; margin: 1rem 0; }
-  .figure-container img { max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; }
-  .interpretation { line-height: 1.7; font-size: 0.9rem; }
-  .interpretation h2 { font-size: 1rem; font-weight: 700; color: #1e3a5f; margin: 1rem 0 0.4rem; }
-  .interpretation p { margin-bottom: 0.6rem; }
-  .interpretation ul { padding-left: 1.4rem; margin-bottom: 0.6rem; }
-  .interpretation li { margin-bottom: 0.3rem; }
-  .interpretation strong { font-weight: 700; }
-  .download-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+/* Analysis picker */
+.method-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.method-row { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 7px; cursor: pointer; }
+.method-row:hover { background: #f8fafc; }
+.method-row input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+.method-label { font-size: 0.875rem; font-weight: 500; }
+.smoke-row { display: flex; align-items: center; gap: 0.7rem; font-size: 0.82rem; color: #475569; margin-top: 0.3rem; }
+.smoke-row input[type="range"] { flex: 1; }
 
-  .alert { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-top: 0.75rem; }
-  .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-  .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-  .alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+/* Status board */
+.status-board { display: flex; flex-direction: column; gap: 0.4rem; max-height: 200px; overflow-y: auto; }
+.status-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; padding: 0.3rem 0.5rem; border-radius: 5px; background: #f8fafc; }
+.status-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; flex-shrink: 0; }
+.s-queued .status-dot { background: #94a3b8; }
+.s-running .status-dot { background: #f59e0b; animation: pulse 1s infinite; }
+.s-success .status-dot { background: #22c55e; }
+.s-failed .status-dot { background: #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.status-label { flex: 1; color: #374151; }
 
-  .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* Report view */
+.report-iframe { width: 100%; height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.locked-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: #f3e8ff; color: #7e22ce; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
 
-  .hidden { display: none !important; }
-  .mt { margin-top: 1rem; }
-  .flex-gap { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+/* Right chat panel */
+.chat-panel { background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
+.chat-panel h2 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.6rem 0.9rem; color: #7fa8c9; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; background: #fafcff; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.msg { max-width: 90%; padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.82rem; line-height: 1.5; }
+.msg-user { background: #2563eb; color: white; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
+.msg-assistant { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-radius: 10px 10px 10px 2px; }
+.chat-input-area { padding: 0.6rem 0.8rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
+.chat-input-row { display: flex; gap: 0.4rem; }
+.chat-input { flex: 1; padding: 0.45rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.82rem; resize: none; height: 2.4rem; }
+.chat-input:focus { outline: none; border-color: #2563eb; }
+.chat-hint { font-size: 0.68rem; color: #94a3b8; }
 
-  .llm-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; background: #f3e8ff; color: #7c3aed; border-radius: 999px; font-weight: 600; }
+/* Spinner */
+.spinner { display: inline-block; width: 0.9rem; height: 0.9rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-  .toggle-row { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; margin-bottom: 0.4rem; }
-  .toggle-btn { background: white; color: #475569; border: none; border-radius: 0; padding: 0.5rem 1.1rem; font-weight: 600; }
-  .toggle-btn + .toggle-btn { border-left: 1px solid #cbd5e1; }
-  .toggle-btn.selected { background: #2563eb; color: white; }
-
-  .check-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 500; color: #475569; cursor: pointer; }
-  .check-row input { width: auto; margin: 0; cursor: pointer; }
-
-  .intent-group { margin-bottom: 1rem; }
-  .intent-group-heading { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #64748b; margin: 0.75rem 0 0.5rem; }
-
-  .manuf-panel { border: 2px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.25rem; }
-  .manuf-title { font-weight: 700; color: #3730a3; margin-bottom: 0.6rem; }
-  .manuf-row { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.85rem; padding: 0.3rem 0; flex-wrap: wrap; }
-  .manuf-key { flex: 0 0 100px; font-weight: 600; color: #475569; }
-  .manuf-bar { height: 0.55rem; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-bottom: 0.2rem; }
-  .manuf-bar-fill { height: 100%; border-radius: 999px; }
-  .manuf-score { font-size: 0.8rem; font-weight: 700; color: #334155; }
-  .manuf-list { margin: 0; padding-left: 1.2rem; }
-  .manuf-list li { font-size: 0.82rem; color: #92400e; }
-  .manuf-note { font-size: 0.8rem; color: #475569; background: #ffffff; border: 1px dashed #c7d2fe; border-radius: 8px; padding: 0.5rem 0.7rem; margin-top: 0.5rem; line-height: 1.5; }
-
-  .validation-band { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.9rem 1rem; margin: 1rem 0; background: #f8fafc; }
-  .check-list { list-style: none; padding: 0; margin: 0; }
-  .check-list li { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.82rem; padding: 0.2rem 0; color: #334155; }
-  .check-pass { color: #15803d; font-weight: 700; }
-  .check-fail { color: #b91c1c; font-weight: 700; }
+/* Utility */
+.hidden { display: none !important; }
+.flex-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.mono { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #475569; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <h1>BGCLens</h1>
-    <span>Post-processing &amp; interpretation for BGCFlow</span>
+  <h1>BGCLens</h1>
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchPage('p1')" id="tab-p1">Dashboard</button>
+    <button class="tab" onclick="switchPage('p2')" id="tab-p2">New Report</button>
   </div>
+  <span class="project-tag" id="project-tag">no project loaded</span>
 </header>
 
-<div class="container">
+<div class="app-body">
 
-  <!-- Step 1: Ingest -->
-  <div class="card" id="step-ingest">
-    <h2><span class="step-num">1</span> Load BGCFlow Project</h2>
-    <label for="project-path">BGCFlow project directory path</label>
-    <div class="flex-gap mt" style="margin-top:0.5rem">
-      <input type="text" id="project-path" placeholder="/path/to/bgcflow/data/processed/my_project" style="flex:1">
-      <button class="btn-primary" id="btn-load" onclick="loadProject()">Load Project</button>
+  <!-- Left: KB panel -->
+  <aside class="kb-panel">
+    <h2>Features / KB</h2>
+    <div class="kb-list" id="kb-list">
+      <div style="padding:0.5rem;font-size:0.75rem;color:#5a7a99;">Load a project to see @mention targets.</div>
     </div>
-    <div id="ingest-error" class="hidden"></div>
-    <div id="manifest-panel" class="hidden">
-      <div class="manifest-grid" id="manifest-grid"></div>
+  </aside>
+
+  <!-- Centre: page switcher -->
+  <div class="centre">
+
+    <!-- P1: Dashboard -->
+    <div class="page active" id="page-p1">
+
+      <!-- 1. Ingest -->
+      <div class="card" id="card-ingest">
+        <h3>&#128194; Load BGCFlow Project</h3>
+        <div class="input-row">
+          <input type="text" id="project-path" placeholder="/path/to/bgcflow/project" />
+          <button class="btn-primary" id="btn-load" onclick="loadProject()">Load</button>
+        </div>
+        <div id="ingest-status" class="hidden"></div>
+        <div id="manifest-info" class="hidden" style="margin-top:0.7rem;font-size:0.82rem;color:#475569;"></div>
+      </div>
+
+      <!-- 2. BGCFlow interactive report embed -->
+      <div class="card hidden" id="card-embed">
+        <h3>&#128202; BGCFlow Interactive Report</h3>
+        <div id="embed-container"></div>
+        <div id="embed-narrative" style="margin-top:0.6rem;font-size:0.82rem;color:#374151;"></div>
+      </div>
+
+      <!-- 3. Cluster profiles -->
+      <div class="card hidden" id="card-clusters">
+        <h3>&#129516; Cluster Profiles</h3>
+        <p style="font-size:0.75rem;color:#64748b;margin-bottom:0.6rem;">Novelty bands are banded priors from retrieval data — not predictions of correctness.</p>
+        <div class="cluster-grid" id="cluster-grid"></div>
+      </div>
+
+      <!-- 4. Analysis options -->
+      <div class="card hidden" id="card-analyses">
+        <h3>&#9879;&#65039; Analysis Options</h3>
+        <div class="method-list" id="method-list">
+          <label class="method-row">
+            <input type="checkbox" value="alpha_diversity" checked>
+            <span class="method-label">Discovery — Alpha diversity</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="manufacturability" checked>
+            <span class="method-label">Manufacturability analysis</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="fisher_exact">
+            <span class="method-label">Enrichment analysis (Fisher's exact)</span>
+          </label>
+        </div>
+        <div class="smoke-row" style="margin-top:0.8rem;">
+          <span>Smoke round:</span>
+          <input type="range" id="smoke-n" min="1" max="10" value="3" oninput="document.getElementById('smoke-val').textContent=this.value">
+          <span><b id="smoke-val">3</b> clusters</span>
+        </div>
+        <div style="margin-top:0.8rem;" class="flex-row">
+          <button class="btn-primary" id="btn-run" onclick="runBatch()" disabled>Run Selected Analyses</button>
+          <span id="run-hint" style="font-size:0.78rem;color:#64748b;"></span>
+        </div>
+      </div>
+
+      <!-- 5. Status board -->
+      <div class="card hidden" id="card-status">
+        <h3>&#9201; Analysis Status</h3>
+        <div class="status-board" id="status-board"></div>
+        <div class="flex-row" style="margin-top:0.7rem;" id="post-run-actions">
+        </div>
+      </div>
+
+    </div><!-- /P1 -->
+
+    <!-- P2: Report -->
+    <div class="page" id="page-p2">
+      <div class="card" id="card-report-view">
+        <h3>&#128196; BGCLens Report</h3>
+        <div id="report-status" style="font-size:0.82rem;color:#64748b;">Run analyses on the Dashboard first, then lock the report here.</div>
+        <div id="report-content" class="hidden"></div>
+        <div class="flex-row" style="margin-top:0.7rem;" id="report-actions"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Step 2: Intent + Topic -->
-  <div class="card hidden" id="step-intent">
-    <h2><span class="step-num">2</span> What do you want to analyse?</h2>
+  </div><!-- /centre -->
 
-    <label>Objective</label>
-    <div class="toggle-row" id="objective-toggle">
-      <button type="button" class="toggle-btn selected" data-objective="discovery" onclick="selectObjective('discovery')">Discovery</button>
-      <button type="button" class="toggle-btn" data-objective="manufacturability" onclick="selectObjective('manufacturability')">Manufacturability</button>
+  <!-- Right: persistent chat -->
+  <aside class="chat-panel">
+    <h2>Chat</h2>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg msg-assistant">Hello! Load a project and run analyses, then ask me questions grounded in the results. Use @mention a cluster or method to scope your question.</div>
     </div>
-    <div class="intent-desc" style="margin-bottom:1rem">Discovery ranks by novelty &amp; diversity. Manufacturability adds a chassis-tractability read on top of your results.</div>
-
-    <div id="intent-groups"></div>
-
-    <label for="topic-input" style="margin-top:1rem">Describe your research question (used to find relevant literature)</label>
-    <textarea id="topic-input" rows="2" placeholder="e.g. Which BGC classes are enriched in the Streptomyces clade compared to Saccharopolyspora?"></textarea>
-
-    <label class="check-row mt">
-      <input type="checkbox" id="use-literature" onchange="state.useLiterature = this.checked">
-      <span>Include published precedent (literature)</span>
-    </label>
-
-    <div class="mt">
-      <button class="btn-primary" id="btn-recommend" onclick="getRecommendations()">Get Method Recommendations</button>
+    <div class="chat-input-area">
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" placeholder="Ask a question… @mention a cluster" rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <button class="btn-primary btn-sm" onclick="sendChat()">Send</button>
+      </div>
+      <div class="chat-hint">@mention a KB object to scope context · LLM grounded in retrieved data only</div>
     </div>
-    <div id="intent-error" class="hidden"></div>
-  </div>
+  </aside>
 
-  <!-- Step 3: Method selection -->
-  <div class="card hidden" id="step-methods">
-    <h2><span class="step-num">3</span> Choose Analysis Method</h2>
-    <div id="method-list"></div>
-    <div class="mt">
-      <button class="btn-primary" id="btn-run" onclick="runAnalysis()">Run Analysis</button>
-    </div>
-    <div id="method-error" class="hidden"></div>
-  </div>
-
-  <!-- Step 4: Result -->
-  <div class="card hidden" id="step-result">
-    <h2><span class="step-num">4</span> Result</h2>
-    <div id="result-content"></div>
-  </div>
-
-</div>
+</div><!-- /app-body -->
 
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
-let state = {
+const state = {
   projectPath: null,
-  manifest: null,
-  intents: [],
-  selectedIntent: null,
-  objective: 'discovery',        // 'discovery' | 'manufacturability'
-  useLiterature: false,
-  recommendations: [],
-  selectedMethod: null,
-  lastRun: null,
+  clusters: [],
+  runIds: [],
+  lockedPath: null,
+  chatHistory: [],
+  kbObjects: [],
 };
 
-// ── API helpers ──────────────────────────────────────────────────────────────
-async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(path, opts);
-  const json = await r.json();
-  if (!r.ok) throw new Error(json.detail || 'API error');
-  return json;
+// ── Page switching ───────────────────────────────────────────────────────────
+function switchPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  document.getElementById('tab-' + p).classList.add('active');
 }
 
-// ── Step 1: Ingest ───────────────────────────────────────────────────────────
+// ── Load project ─────────────────────────────────────────────────────────────
 async function loadProject() {
   const path = document.getElementById('project-path').value.trim();
-  if (!path) return showError('ingest-error', 'Please enter a project path.');
-
+  if (!path) return;
   const btn = document.getElementById('btn-load');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Loading&hellip;';
-  hideError('ingest-error');
+  btn.innerHTML = '<span class="spinner"></span>';
+  const statusEl = document.getElementById('ingest-status');
+  statusEl.className = 'alert alert-info';
+  statusEl.textContent = 'Loading project…';
+  statusEl.classList.remove('hidden');
 
   try {
-    const data = await api('POST', '/api/open', { path });
+    const res = await fetch('/api/open', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Load failed');
+
     state.projectPath = path;
-    state.manifest = data;
-    showManifest(data);
-    await loadIntents();
-    show('step-intent');
+    document.getElementById('project-tag').textContent = 'project: ' + data.project_name;
+    document.getElementById('manifest-info').innerHTML =
+      `<b>${data.gcf_count}</b> GCFs · <b>${data.genome_count}</b> genomes · pipelines: ${(data.available_pipelines||[]).join(', ')||'none'}`;
+    document.getElementById('manifest-info').classList.remove('hidden');
+    statusEl.className = 'alert alert-info';
+    statusEl.textContent = '✔ Project loaded.';
+
+    await Promise.all([loadEmbedReport(data), loadClusters(), loadKB()]);
+    document.getElementById('card-embed').classList.remove('hidden');
+    document.getElementById('card-clusters').classList.remove('hidden');
+    document.getElementById('card-analyses').classList.remove('hidden');
+    document.getElementById('btn-run').disabled = false;
   } catch(e) {
-    showError('ingest-error', e.message);
+    statusEl.className = 'alert alert-error';
+    statusEl.textContent = '✖ ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Load Project';
+    btn.textContent = 'Load';
   }
 }
 
-function showManifest(m) {
-  const grid = document.getElementById('manifest-grid');
-  const yesNo = (v) => v
-    ? '<span class="badge badge-safe">yes</span>'
-    : '<span class="badge badge-lit-none">no</span>';
-  grid.innerHTML = [
-    ['Project', m.project_name],
-    ['Genomes', m.genome_count],
-    ['GCFs', m.gcf_count],
-    ['Pipelines', m.available_pipelines.join(', ') || 'none'],
-    ['Counts', yesNo(m.has_counts)],
-    ['Taxonomy', yesNo(m.has_taxonomy)],
-    ['Network', yesNo(m.has_network)],
-  ].map(([l, v]) => `<div class="manifest-item"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
-  show('manifest-panel');
-}
-
-// ── Step 2: Intents ──────────────────────────────────────────────────────────
-async function loadIntents() {
-  const data = await api('GET', '/api/intents');
-  state.intents = data.intents;
-  const container = document.getElementById('intent-groups');
-
-  // Preserve declared order, but bucket by `group`.
-  const order = ['Analytical', 'Research questions'];
-  const groups = {};
-  data.intents.forEach(i => {
-    const g = i.group || 'Analytical';
-    (groups[g] = groups[g] || []).push(i);
-  });
-  const groupNames = order.filter(g => groups[g]).concat(
-    Object.keys(groups).filter(g => !order.includes(g))
-  );
-
-  container.innerHTML = groupNames.map(g => `
-    <div class="intent-group">
-      <div class="intent-group-heading">${g}</div>
-      <div class="intent-grid">
-        ${groups[g].map(i => `
-          <label class="intent-card" onclick="selectIntent('${i.value}', this)">
-            <input type="radio" name="intent" value="${i.value}">
-            <div class="intent-label">${i.label}</div>
-            <div class="intent-desc">${i.description}</div>
-          </label>`).join('')}
-      </div>
-    </div>`).join('');
-}
-
-function selectIntent(value, el) {
-  document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  state.selectedIntent = value;
-}
-
-function selectObjective(value) {
-  state.objective = value;
-  document.querySelectorAll('#objective-toggle .toggle-btn').forEach(b =>
-    b.classList.toggle('selected', b.dataset.objective === value));
-}
-
-async function getRecommendations() {
-  if (!state.selectedIntent) return showError('intent-error', 'Please choose an analysis intent.');
-  const topic = document.getElementById('topic-input').value.trim() || 'BGC analysis';
-
-  const btn = document.getElementById('btn-recommend');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Getting recommendations&hellip;';
-  hideError('intent-error');
-
-  try {
-    const data = await api('POST', '/api/recommend', {
-      path: state.projectPath,
-      intent: state.selectedIntent,
-      topic,
-      use_literature: state.useLiterature,
-      objective: state.objective === 'manufacturability' ? 'manufacturability' : null,
-    });
-
-    if (!data.valid) {
-      showError('intent-error', data.suggestion || 'Intent not compatible with available data.');
-      return;
-    }
-    state.recommendations = data.recommendations;
-    state.selectedMethod = data.recommendations.find(r => r.is_recommended)?.method_id || data.recommendations[0]?.method_id;
-    renderMethods(data.recommendations);
-    show('step-methods');
-  } catch(e) {
-    showError('intent-error', e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Get Method Recommendations';
+// ── BGCFlow embed ─────────────────────────────────────────────────────────────
+async function loadEmbedReport(manifest) {
+  const ec = document.getElementById('embed-container');
+  // Try conventional BGCFlow report path
+  const reportUrl = manifest.source_path ? manifest.source_path + '/quarto/index.html' : null;
+  if (reportUrl) {
+    ec.innerHTML = `<iframe class="bgcflow-embed" src="${reportUrl}" sandbox="allow-scripts allow-same-origin"></iframe>`;
+  } else {
+    ec.innerHTML = `<div class="embed-placeholder">BGCFlow interactive report not found at the conventional path (<code>quarto/index.html</code>). Proceeding without embed — all BGCLens analyses available below.</div>`;
   }
 }
 
-// ── Step 3: Methods ──────────────────────────────────────────────────────────
-function renderMethods(recs) {
-  const list = document.getElementById('method-list');
-  const manufPanel = renderManufacturability(recs);
-  list.innerHTML = manufPanel + recs.map(r => {
-    const costClass = {'Safe':'badge-safe','Heavy':'badge-heavy','Likely-to-fail':'badge-fail'}[r.cost_class] || 'badge-safe';
-    const litClass = {'strong':'badge-lit-strong','moderate':'badge-lit-moderate','weak':'badge-lit-none'}[r.literature_support] || 'badge-lit-none';
-    const litLabel = r.literature_support === 'unknown' ? '' : `Literature: ${r.literature_support}`;
-    const warnings = r.assumption_warnings.map(w => `<div class="warning-item">&#9888; ${w}</div>`).join('');
-    const recTag = r.is_recommended ? '<span class="rec-tag">&#10003; Recommended</span>' : '';
-    return `
-      <div class="method-card ${r.is_recommended ? 'recommended' : ''} ${state.selectedMethod === r.method_id ? 'selected' : ''}"
-           id="mcard-${r.method_id}" onclick="selectMethod('${r.method_id}')">
-        <div class="method-header">
-          <span class="method-name">${r.method_name}</span>
-          ${recTag}
-          <span class="badge ${costClass}">${r.cost_class}</span>
-          ${litLabel ? `<span class="badge ${litClass}">${litLabel}</span>` : ''}
-        </div>
-        <div style="font-size:0.78rem;color:#64748b;margin-top:0.3rem">${r.cost_reason}</div>
-        <div class="warning-list">${warnings}</div>
+// ── Clusters ──────────────────────────────────────────────────────────────────
+async function loadClusters() {
+  if (!state.projectPath) return;
+  const res = await fetch('/api/clusters?path=' + encodeURIComponent(state.projectPath));
+  const data = await res.json();
+  state.clusters = data.clusters || [];
+  renderClusters();
+}
+
+function renderClusters() {
+  const grid = document.getElementById('cluster-grid');
+  grid.innerHTML = '';
+  const display = state.clusters.slice(0, 30);
+  for (const c of display) {
+    const band = c.novelty_band || 'low';
+    const bandClass = 'band-' + band.replace(/\s+/g, '-');
+    grid.innerHTML += `
+      <div class="cluster-card" onclick="mentionCluster('${c.cluster_id}')">
+        <div class="cluster-id">${c.cluster_id}</div>
+        <div class="cluster-type">${c.cluster_type || 'unknown'} · ${c.organism || '—'}</div>
+        <span class="band-chip ${bandClass}">${band}</span>
       </div>`;
-  }).join('');
-}
-
-function selectMethod(methodId) {
-  state.selectedMethod = methodId;
-  document.querySelectorAll('.method-card').forEach(c => c.classList.remove('selected'));
-  const card = document.getElementById('mcard-' + methodId);
-  if (card) card.classList.add('selected');
-}
-
-function renderManufacturability(recs) {
-  if (state.objective !== 'manufacturability') return '';
-  const alts = (recs && recs[0] && recs[0].alternatives) || [];
-  const m = alts.find(a => a && a.objective === 'manufacturability');
-  if (!m) return '';
-
-  const score = typeof m.tractability_score === 'number' ? m.tractability_score : 0;
-  const pct = Math.max(0, Math.min(1, score)) * 100;
-  const scoreColor = score >= 0.66 ? '#16a34a' : score >= 0.33 ? '#a16207' : '#b91c1c';
-
-  const chassis = m.chassis_hint
-    ? `<div class="manuf-row"><span class="manuf-key">Chassis hint</span>
-         <span><strong>${m.chassis_hint.organism || '—'}</strong>${m.chassis_hint.reason ? ` — ${m.chassis_hint.reason}` : ''}</span></div>`
-    : `<div class="manuf-row"><span class="manuf-key">Chassis hint</span><span class="intent-desc">unavailable (taxonomy/class missing)</span></div>`;
-
-  const blockers = (m.blockers && m.blockers.length)
-    ? `<div class="manuf-row"><span class="manuf-key">Blockers</span>
-         <ul class="manuf-list">${m.blockers.map(b => `<li>&#9888; ${b}</li>`).join('')}</ul></div>`
-    : `<div class="manuf-row"><span class="manuf-key">Blockers</span><span class="intent-desc">none flagged</span></div>`;
-
-  const notes = (m.notes && m.notes.length)
-    ? `<div class="manuf-note">${m.notes.map(n => `<div>&#9432; ${n}</div>`).join('')}</div>`
-    : '';
-
-  return `
-    <div class="manuf-panel">
-      <div class="manuf-title">Manufacturability</div>
-      <div class="manuf-row">
-        <span class="manuf-key">Tractability</span>
-        <span style="flex:1;min-width:160px">
-          <div class="manuf-bar"><div class="manuf-bar-fill" style="width:${pct}%;background:${scoreColor}"></div></div>
-          <span class="manuf-score">${score.toFixed(2)}</span>
-        </span>
-      </div>
-      <div class="manuf-row"><span class="manuf-key">Top class</span><span><strong>${m.top_class || '—'}</strong></span></div>
-      ${chassis}
-      ${blockers}
-      ${notes}
-    </div>`;
-}
-
-// ── Step 4: Run ──────────────────────────────────────────────────────────────
-async function runAnalysis() {
-  if (!state.selectedMethod) return showError('method-error', 'Please select a method.');
-
-  const btn = document.getElementById('btn-run');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Running analysis&hellip;';
-  hideError('method-error');
-
-  try {
-    const data = await api('POST', '/api/run', {
-      path: state.projectPath,
-      method_id: state.selectedMethod,
-      params: {},
-      use_llm: true,
-    });
-    state.lastRun = data;
-    renderResult(data);
-    show('step-result');
-    document.getElementById('step-result').scrollIntoView({ behavior: 'smooth' });
-  } catch(e) {
-    showError('method-error', e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Run Analysis';
+  }
+  if (state.clusters.length > 30) {
+    grid.innerHTML += `<div style="font-size:0.75rem;color:#64748b;padding:0.5rem;">+${state.clusters.length-30} more</div>`;
   }
 }
 
-function renderResult(data) {
-  const warnings = (data.assumption_warnings || [])
-    .map(w => `<div class="alert alert-warn">&#9888; ${w}</div>`).join('');
-
-  const llmBadge = data.llm_used
-    ? '<span class="llm-badge">&#10024; Interpretation enhanced by LLM</span>'
-    : '';
-
-  const figureHtml = data.figure_svg_b64
-    ? `<div class="figure-container">
-         <img src="data:image/svg+xml;base64,${data.figure_svg_b64}" alt="Analysis figure">
-       </div>`
-    : '<div class="alert alert-info">Figure not available for this method.</div>';
-
-  const interpretation = renderMarkdown(data.interpretation || '');
-
-  const pngHref = data.figure_png_b64
-    ? `data:image/png;base64,${data.figure_png_b64}`
-    : null;
-  const svgHref = data.figure_svg_b64
-    ? `data:image/svg+xml;base64,${data.figure_svg_b64}`
-    : null;
-
-  const downloadBtns = [
-    pngHref ? `<a href="${pngHref}" download="bgclens_figure.png"><button class="btn-download">&#11015; PNG</button></a>` : '',
-    svgHref ? `<a href="${svgHref}" download="bgclens_figure.svg"><button class="btn-download" style="background:#0369a1">&#11015; SVG</button></a>` : '',
-  ].join('');
-
-  const validationHtml = renderValidationBand(data);
-
-  const reportBtn = data.run_id
-    ? `<button class="btn-primary mt" id="btn-report" onclick="generateReport()">&#128196; Generate Report</button>
-       <div id="report-output"></div>`
-    : '';
-
-  document.getElementById('result-content').innerHTML = `
-    ${warnings}
-    ${figureHtml}
-    <div class="download-row">${downloadBtns}</div>
-    ${validationHtml}
-    <div class="result-section">
-      <div class="flex-gap" style="margin-bottom:0.75rem">
-        <strong>Interpretation</strong> ${llmBadge}
-      </div>
-      <div class="interpretation">${interpretation}</div>
-    </div>
-    ${reportBtn}
-  `;
+function mentionCluster(id) {
+  const inp = document.getElementById('chat-input');
+  inp.value = '@' + id + ' ';
+  inp.focus();
 }
 
-function renderValidationBand(data) {
-  const band = data.confidence_band;
-  const checks = data.validation_checks || [];
-  if (!band && !checks.length) return '';
-
-  const bandMap = {
-    green: { cls: 'badge-safe',  label: 'Green — validated' },
-    amber: { cls: 'badge-heavy', label: 'Amber — proceed with caution' },
-    red:   { cls: 'badge-fail',  label: 'Red — likely unreliable' },
-  };
-  const b = bandMap[band];
-  const bandBadge = b
-    ? `<span class="badge ${b.cls}">Confidence: ${b.label}</span>`
-    : '<span class="badge badge-lit-none">Confidence: unknown</span>';
-
-  const checklist = checks.length
-    ? `<ul class="check-list">${checks.map(c => `
-         <li>
-           <span class="${c.passed ? 'check-pass' : 'check-fail'}">${c.passed ? '&#10003;' : '&#10007;'}</span>
-           <span><strong>${c.name}</strong>${c.detail ? ` — ${c.detail}` : ''}</span>
-         </li>`).join('')}</ul>`
-    : '';
-
-  return `
-    <div class="validation-band">
-      <div class="flex-gap" style="margin-bottom:0.5rem"><strong>Validation confidence</strong> ${bandBadge}</div>
-      ${checklist}
-    </div>`;
+// ── KB panel ──────────────────────────────────────────────────────────────────
+async function loadKB() {
+  if (!state.projectPath) return;
+  const res = await fetch('/api/kb?path=' + encodeURIComponent(state.projectPath));
+  const data = await res.json();
+  state.kbObjects = data.objects || [];
+  renderKB();
 }
 
-async function generateReport() {
-  const btn = document.getElementById('btn-report');
-  const out = document.getElementById('report-output');
-  if (!state.lastRun || !state.lastRun.run_id) return;
+function renderKB() {
+  const list = document.getElementById('kb-list');
+  list.innerHTML = '';
+  for (const obj of state.kbObjects.slice(0, 60)) {
+    const typeClass = obj.type === 'cluster' ? 'kb-type-cluster' : obj.type === 'method' ? 'kb-type-method' : 'kb-type-report';
+    const typeLabel = obj.type === 'cluster' ? 'C' : obj.type === 'method' ? 'M' : 'R';
+    list.innerHTML += `
+      <div class="kb-item" onclick="insertMention('${obj.id}')" title="@${obj.id}">
+        <span class="kb-type ${typeClass}">${typeLabel}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${obj.label}</span>
+      </div>`;
+  }
+}
 
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Generating report&hellip;';
+function insertMention(id) {
+  const inp = document.getElementById('chat-input');
+  inp.value += '@' + id + ' ';
+  inp.focus();
+}
+
+// ── Run batch ─────────────────────────────────────────────────────────────────
+async function runBatch() {
+  if (!state.projectPath) return;
+  const checked = [...document.querySelectorAll('#method-list input[type=checkbox]:checked')];
+  if (!checked.length) { alert('Select at least one analysis method.'); return; }
+
+  const methodIds = checked.map(el => el.value);
+  const smokeN = parseInt(document.getElementById('smoke-n').value, 10);
+
+  document.getElementById('card-status').classList.remove('hidden');
+  const board = document.getElementById('status-board');
+  board.innerHTML = '';
+  const statusRows = {};
+
+  // Create placeholder rows
+  for (const mid of methodIds) {
+    statusRows[mid] = document.createElement('div');
+    statusRows[mid].className = 'status-row s-queued';
+    statusRows[mid].innerHTML = `<span class="status-dot"></span><span class="status-label">${mid} — queued (up to ${smokeN} clusters)</span>`;
+    board.appendChild(statusRows[mid]);
+  }
+
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('run-hint').textContent = 'Running…';
 
   try {
-    const data = await api('POST', '/api/report', { run_id: state.lastRun.run_id });
-    if (data.html_b64) {
-      const href = `data:text/html;base64,${data.html_b64}`;
-      out.innerHTML = `
-        <div class="alert alert-info">Report rendered.</div>
-        <div class="download-row">
-          <a href="${href}" download="bgclens_report.html"><button class="btn-download">&#11015; Download HTML report</button></a>
-          <a href="${href}" target="_blank" rel="noopener"><button class="btn-secondary">Open in new tab</button></a>
-        </div>`;
-    } else {
-      out.innerHTML = `
-        <div class="alert alert-warn">Quarto isn't installed, so the HTML report couldn't be rendered.
-          The Quarto source was written to:<br><code>${data.qmd_path || 'unknown'}</code></div>`;
+    // Set method rows to running
+    for (const mid of methodIds) {
+      statusRows[mid].className = 'status-row s-running';
+      statusRows[mid].querySelector('.status-label').textContent = `${mid} — running…`;
     }
+
+    const res = await fetch('/api/run-batch', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        path: state.projectPath,
+        method_ids: methodIds,
+        cluster_ids: null,  // auto smoke round
+        use_llm: true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Batch run failed');
+
+    state.runIds = data.run_ids || [];
+
+    // Mark all as success or fail per result
+    board.innerHTML = '';
+    for (const r of (data.results || [])) {
+      const cid = r._cluster_id || '?';
+      const mid = r.method || r._method_id || '?';
+      const err = r._error;
+      const row = document.createElement('div');
+      row.className = 'status-row ' + (err ? 's-failed' : 's-success');
+      row.innerHTML = `<span class="status-dot"></span><span class="status-label">${mid} @ ${cid}${err ? ': ' + err : ''}</span>`;
+      board.appendChild(row);
+    }
+
+    document.getElementById('run-hint').textContent = `✔ ${data.results?.length || 0} tasks completed. ${state.runIds.length} records saved.`;
+
+    // Show post-run actions
+    document.getElementById('post-run-actions').innerHTML = `
+      <button class="btn-success btn-sm" onclick="renderLockReport(event)">Render &amp; Lock Report</button>
+      <button class="btn-primary btn-sm" onclick="switchPage('p2')">View Report →</button>
+    `;
+
+    // Refresh KB
+    await loadKB();
   } catch(e) {
-    out.innerHTML = `<div class="alert alert-error">&#10007; ${e.message}</div>`;
+    document.getElementById('run-hint').textContent = '✖ ' + e.message;
+    board.innerHTML += `<div class="status-row s-failed"><span class="status-dot"></span><span class="status-label">${e.message}</span></div>`;
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '&#128196; Generate Report';
+    document.getElementById('btn-run').disabled = false;
   }
 }
 
-// ── Simple Markdown renderer ─────────────────────────────────────────────────
-function renderMarkdown(md) {
-  return md
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/((<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hup])/gm, '')
-    .replace(/\n/g, '<br>')
-    .replace(/^(.+)$/gm, (_, p) => p.startsWith('<') ? p : `<p>${p}</p>`);
+// ── Render + lock report ──────────────────────────────────────────────────────
+async function renderLockReport(event) {
+  if (!state.runIds.length) { alert('Run analyses first.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Rendering…';
+
+  try {
+    const res = await fetch('/api/report/lock', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({run_ids: state.runIds, wrap_rocrate: false}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Lock failed');
+
+    state.lockedPath = data.locked_path || data.qmd_path;
+
+    // Switch to P2 and show report
+    switchPage('p2');
+    const content = document.getElementById('report-content');
+    content.classList.remove('hidden');
+    document.getElementById('report-status').classList.add('hidden');
+
+    let html = '';
+    if (data.html_b64) {
+      const blob = new Blob([atob(data.html_b64)], {type:'text/html'});
+      const url = URL.createObjectURL(blob);
+      html = `<iframe class="report-iframe" src="${url}"></iframe>`;
+    } else {
+      html = `<div class="alert alert-info">Report QMD written: <span class="mono">${data.qmd_path || data.locked_path}</span><br>Quarto not installed — download the .qmd to render locally.</div>`;
+    }
+
+    const lockedInfo = data.locked_path ? `<div class="locked-badge">🔒 Immutable: ${data.locked_path.split('/').pop()}</div>` : '';
+    content.innerHTML = html + lockedInfo;
+
+    document.getElementById('report-actions').innerHTML = `
+      ${data.locked_path ? `<a href="/api/report/download?path=${encodeURIComponent(data.locked_path)}" class="btn-primary btn-sm">Download .qmd</a>` : ''}
+      <button class="btn-lock btn-sm" onclick="wrapRoCrate()">Wrap RO-Crate</button>
+    `;
+  } catch(e) {
+    document.getElementById('report-status').textContent = '✖ ' + e.message;
+    document.getElementById('report-status').className = 'alert alert-error';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Render & Lock Report';
+  }
 }
 
-// ── Utilities ────────────────────────────────────────────────────────────────
-function show(id) { document.getElementById(id).classList.remove('hidden'); }
-function hide(id) { document.getElementById(id).classList.add('hidden'); }
-function showError(id, msg) {
-  const el = document.getElementById(id);
-  el.className = 'alert alert-error';
-  el.textContent = '✖ ' + msg;
-  el.classList.remove('hidden');
+async function wrapRoCrate() {
+  if (!state.runIds.length) return;
+  const res = await fetch('/api/report/lock', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({run_ids: state.runIds, wrap_rocrate: true}),
+  });
+  const data = await res.json();
+  if (data.rocrate_path) {
+    document.getElementById('report-actions').innerHTML += `<span class="alert alert-info" style="padding:0.3rem 0.6rem;">RO-Crate: ${data.rocrate_path.split('/').pop()}</span>`;
+  } else {
+    alert('RO-Crate wrap failed (non-fatal) — rocrate package may not be installed.');
+  }
 }
-function hideError(id) { document.getElementById(id).classList.add('hidden'); }
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg || !state.projectPath) {
+    if (!state.projectPath) appendMsg('assistant', 'Please load a project first.');
+    return;
+  }
+  inp.value = '';
+
+  appendMsg('user', msg);
+  state.chatHistory.push({role: 'user', content: msg});
+
+  const placeholder = appendMsg('assistant', '…');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        path: state.projectPath,
+        run_ids: state.runIds,
+        message: msg,
+        history: state.chatHistory.slice(-6),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Chat failed');
+    const reply = data.reply || 'No response.';
+    placeholder.textContent = reply;
+    state.chatHistory.push({role: 'assistant', content: reply});
+  } catch(e) {
+    placeholder.textContent = '✖ ' + e.message;
+  }
+}
+
+function appendMsg(role, content) {
+  const msgs = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'msg msg-' + role;
+  el.textContent = content;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  return el;
+}
 </script>
-
 </body>
 </html>

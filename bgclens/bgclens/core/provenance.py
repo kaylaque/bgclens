@@ -21,6 +21,10 @@ class RunRecord(BaseModel):
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    locked: bool = False
+    locked_at: str | None = None
+    report_path: str | None = None
+    rocrate_path: str | None = None
 
     def to_yaml(self) -> str:
         return yaml.dump({"bgclens_run": self.model_dump()}, sort_keys=False)
@@ -29,6 +33,36 @@ class RunRecord(BaseModel):
     def from_yaml(cls, text: str) -> "RunRecord":
         data = yaml.safe_load(text)
         return cls(**data["bgclens_run"])
+
+    def lock(self, report_file: "Path") -> "Path":
+        """Rename report_file to timestamp_project.qmd and mark this record immutable.
+
+        Idempotent: if already locked, returns existing locked_path.
+        """
+        import os
+        from datetime import datetime, timezone
+
+        if self.locked and self.report_path:
+            existing = Path(self.report_path)
+            if existing.exists():
+                return existing
+
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        slug = Path(self.project_path).name.replace(" ", "_")[:40]
+        locked_name = f"{ts}_{slug}{report_file.suffix}"
+        locked_path = report_file.parent / locked_name
+
+        report_file.rename(locked_path)
+        # Make read-only
+        try:
+            os.chmod(locked_path, 0o444)
+        except Exception:
+            pass
+
+        self.locked = True
+        self.locked_at = datetime.now(timezone.utc).isoformat()
+        self.report_path = str(locked_path)
+        return locked_path
 
     def save(self, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
