@@ -22,7 +22,7 @@ REMOTE_RUNDIR  ?= /home/kqueenazima/bgcflow-run
 LOCAL_DATA     ?= ./remote-data
 
 # Web UI port, used by both `web` and `tunnel`.
-PORT           ?= 8765
+PORT           ?= 8766
 
 # ---------------------------------------------------------------- local paths
 VENV           := .venv

@@ -3,378 +3,1092 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BGCLens — Post-Processing for BGCFlow</title>
+<title>BGCLens — v2 Dashboard</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #f0f4f8; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-  header { background: #1e3a5f; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-  header h1 { font-size: 1.5rem; font-weight: 700; }
-  header span { opacity: 0.7; font-size: 0.9rem; }
+/* Header */
+header { background: #1e3a5f; color: white; padding: 0.6rem 1.2rem; display: flex; align-items: center; gap: 1rem; flex-shrink: 0; z-index: 10; }
+header h1 { font-size: 1.2rem; font-weight: 700; }
+.tab-bar { display: flex; gap: 0.25rem; margin-left: 1rem; }
+.tab { padding: 0.35rem 1rem; border-radius: 6px 6px 0 0; font-size: 0.82rem; font-weight: 600; cursor: pointer; color: rgba(255,255,255,0.7); border: none; background: transparent; }
+.tab.active { background: white; color: #1e3a5f; }
+.project-tag { margin-left: auto; font-size: 0.78rem; opacity: 0.7; }
 
-  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+/* Main layout */
+.app-body { display: grid; grid-template-columns: 220px 1fr 320px; flex: 1; overflow: hidden; gap: 0; }
 
-  .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
-  .card h2 { font-size: 1.1rem; font-weight: 600; color: #1e3a5f; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-  .step-num { background: #2563eb; color: white; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+/* Left KB panel */
+.kb-panel { background: #1a2d4a; color: #c8d6e5; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #0f1f30; transition: width 0.2s ease; }
+.kb-panel h2 { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.75rem 0.9rem 0.4rem; color: #7fa8c9; white-space: nowrap; }
+.kb-list { overflow-y: auto; flex: 1; padding: 0 0.5rem 0.5rem; }
+.kb-item { padding: 0.35rem 0.5rem; border-radius: 5px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
+.kb-item:hover { background: rgba(255,255,255,0.07); }
+.kb-type { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+.kb-type-cluster { background: #1d4ed8; color: white; }
+.kb-type-method { background: #15803d; color: white; }
+.kb-type-report { background: #7e22ce; color: white; }
 
-  label { display: block; font-size: 0.875rem; font-weight: 500; color: #475569; margin-bottom: 0.4rem; }
-  input[type="text"], textarea { width: 100%; padding: 0.6rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; transition: border-color 0.15s; }
-  input[type="text"]:focus, textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+/* Centre */
+.centre { display: flex; flex-direction: column; overflow: hidden; }
+.page { display: none; flex-direction: column; flex: 1; overflow-y: auto; padding: 1rem 1.2rem; gap: 0.9rem; }
+.page.active { display: flex; }
 
-  button { padding: 0.6rem 1.4rem; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: #2563eb; color: white; }
-  .btn-primary:hover { background: #1d4ed8; }
-  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-  .btn-secondary { background: #f1f5f9; color: #475569; }
-  .btn-download { background: #16a34a; color: white; }
-  .btn-download:hover { background: #15803d; }
+/* Cards */
+.card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 1rem 1.2rem; }
+.card h3 { font-size: 0.9rem; font-weight: 600; color: #1e3a5f; margin-bottom: 0.7rem; display: flex; align-items: center; gap: 0.5rem; }
 
-  .badge { display: inline-flex; align-items: center; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-  .badge-safe { background: #dcfce7; color: #15803d; }
-  .badge-heavy { background: #fef9c3; color: #a16207; }
-  .badge-fail { background: #fee2e2; color: #b91c1c; }
-  .badge-lit-strong { background: #dbeafe; color: #1d4ed8; }
-  .badge-lit-moderate { background: #ede9fe; color: #6d28d9; }
-  .badge-lit-none { background: #f1f5f9; color: #64748b; }
+/* Inputs */
+.input-row { display: flex; gap: 0.5rem; }
+input[type="text"] { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.9rem; }
+input[type="text"]:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-success { background: #16a34a; color: white; }
+.btn-success:hover:not(:disabled) { background: #15803d; }
+.btn-success:disabled { background: #86efac; cursor: not-allowed; }
+.btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+.btn-lock { background: #7e22ce; color: white; }
+.btn-lock:hover { background: #6b21a8; }
 
-  .manifest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
-  .manifest-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; }
-  .manifest-item .label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.2rem; }
-  .manifest-item .value { font-size: 1.1rem; font-weight: 700; color: #1e3a5f; }
+/* Alerts */
+.alert { padding: 0.6rem 0.9rem; border-radius: 7px; font-size: 0.82rem; }
+.alert-error { background: #fee2e2; color: #991b1b; }
+.alert-info { background: #eff6ff; color: #1e40af; }
+.alert-warn { background: #fffbeb; color: #92400e; }
 
-  .intent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
-  .intent-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.9rem 1rem; cursor: pointer; transition: all 0.15s; }
-  .intent-card:hover { border-color: #93c5fd; background: #eff6ff; }
-  .intent-card.selected { border-color: #2563eb; background: #eff6ff; }
-  .intent-card input { display: none; }
-  .intent-card .intent-label { font-weight: 600; font-size: 0.9rem; color: #1e3a5f; }
-  .intent-card .intent-desc { font-size: 0.78rem; color: #64748b; margin-top: 0.2rem; }
+/* BGCFlow embed */
+.bgcflow-embed { width: 100%; height: 320px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.embed-placeholder { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2rem; text-align: center; color: #64748b; font-size: 0.85rem; }
 
-  .method-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.15s; }
-  .method-card:hover { border-color: #93c5fd; }
-  .method-card.selected { border-color: #2563eb; background: #eff6ff; }
-  .method-card.recommended { border-color: #16a34a; }
-  .method-header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-  .method-name { font-weight: 600; font-size: 0.95rem; }
-  .rec-tag { background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
-  .warning-list { margin-top: 0.5rem; }
-  .warning-item { font-size: 0.78rem; color: #92400e; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 0.3rem 0.6rem; margin-top: 0.3rem; border-radius: 0 4px 4px 0; }
+/* Cluster profiles */
+.cluster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; }
+.cluster-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.7rem; cursor: pointer; transition: border-color 0.15s; }
+.cluster-card:hover { border-color: #93c5fd; }
+.cluster-id { font-size: 0.8rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.3rem; }
+.cluster-type { font-size: 0.72rem; color: #64748b; margin-bottom: 0.4rem; }
+.band-chip { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.band-high { background: #dbeafe; color: #1d4ed8; }
+.band-medium { background: #fef9c3; color: #a16207; }
+.band-low { background: #f1f5f9; color: #475569; }
+.band-novel-candidate { background: #f3e8ff; color: #7e22ce; }
 
-  .result-section { margin-top: 1rem; }
-  .figure-container { text-align: center; margin: 1rem 0; }
-  .figure-container img { max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; }
-  .interpretation { line-height: 1.7; font-size: 0.9rem; }
-  .interpretation h2 { font-size: 1rem; font-weight: 700; color: #1e3a5f; margin: 1rem 0 0.4rem; }
-  .interpretation p { margin-bottom: 0.6rem; }
-  .interpretation ul { padding-left: 1.4rem; margin-bottom: 0.6rem; }
-  .interpretation li { margin-bottom: 0.3rem; }
-  .interpretation strong { font-weight: 700; }
-  .download-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+/* Analysis picker */
+.method-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.method-row { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 7px; cursor: pointer; }
+.method-row:hover { background: #f8fafc; }
+.method-row input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+.method-label { font-size: 0.875rem; font-weight: 500; }
+.smoke-row { display: flex; align-items: center; gap: 0.7rem; font-size: 0.82rem; color: #475569; margin-top: 0.3rem; }
+.smoke-row input[type="range"] { flex: 1; }
 
-  .alert { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-top: 0.75rem; }
-  .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-  .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-  .alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+/* Status board */
+.status-board { display: flex; flex-direction: column; gap: 0.4rem; max-height: 200px; overflow-y: auto; }
+.status-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; padding: 0.3rem 0.5rem; border-radius: 5px; background: #f8fafc; }
+.status-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; flex-shrink: 0; }
+.s-queued .status-dot { background: #94a3b8; }
+.s-running .status-dot { background: #f59e0b; animation: pulse 1s infinite; }
+.s-success .status-dot { background: #22c55e; }
+.s-failed .status-dot { background: #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.status-label { flex: 1; color: #374151; }
 
-  .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* Report view */
+.report-iframe { width: 100%; height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.locked-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: #f3e8ff; color: #7e22ce; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
 
-  .hidden { display: none !important; }
-  .mt { margin-top: 1rem; }
-  .flex-gap { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+/* Right chat panel */
+.chat-panel { background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; transition: width 0.2s ease; }
+.chat-panel h2 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.6rem 0.9rem; color: #7fa8c9; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; background: #fafcff; display: flex; align-items: center; white-space: nowrap; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.msg { max-width: 90%; padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.82rem; line-height: 1.5; }
+.msg-user { background: #2563eb; color: white; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
+.msg-assistant { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-radius: 10px 10px 10px 2px; }
+.msg-assistant h2, .msg-assistant h3, .msg-assistant h4 { font-size: 0.85rem; font-weight: 700; margin: 0.4rem 0 0.2rem; }
+.msg-assistant p { margin-bottom: 0.35rem; }
+.msg-assistant p:last-child { margin-bottom: 0; }
+.msg-assistant ul, .msg-assistant ol { padding-left: 1.2rem; margin: 0.2rem 0 0.35rem; }
+.msg-assistant li { margin-bottom: 0.15rem; font-size: 0.82rem; }
+.msg-assistant strong { font-weight: 700; }
+.msg-assistant em { font-style: italic; }
+.msg-assistant code { font-family: ui-monospace, monospace; font-size: 0.78rem; background: #e2e8f0; padding: 0.1rem 0.25rem; border-radius: 3px; }
+.msg-assistant hr { border: none; border-top: 1px solid #cbd5e1; margin: 0.4rem 0; }
+.chat-input-area { padding: 0.6rem 0.8rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
+.chat-input-row { display: flex; gap: 0.4rem; }
+.chat-input { flex: 1; padding: 0.45rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.82rem; resize: none; height: 2.4rem; }
+.chat-input:focus { outline: none; border-color: #2563eb; }
+.chat-hint { font-size: 0.68rem; color: #94a3b8; }
 
-  .llm-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; background: #f3e8ff; color: #7c3aed; border-radius: 999px; font-weight: 600; }
+/* Spinner */
+.spinner { display: inline-block; width: 0.9rem; height: 0.9rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Utility */
+.hidden { display: none !important; }
+.flex-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.mono { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #475569; }
+
+/* Panel toggles — fixed position so parent overflow:hidden never clips them */
+.panel-toggle {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 52px; cursor: pointer; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; user-select: none;
+  transition: left 0.2s ease, right 0.2s ease;
+}
+.kb-panel-toggle {
+  left: 220px; background: #1a2d4a; color: #7fa8c9;
+  border: 1px solid #0f1f30; border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+.chat-panel-toggle {
+  right: 320px; background: #f8fafc; color: #7fa8c9;
+  border: 1px solid #e2e8f0; border-right: none;
+  border-radius: 6px 0 0 6px;
+}
+/* Collapsed states */
+.app-body.kb-collapsed { grid-template-columns: 0px 1fr 320px; }
+.app-body.kb-collapsed .kb-panel { min-width: 0; }
+.app-body.kb-collapsed .kb-panel-toggle { left: 0; }
+.app-body.chat-collapsed { grid-template-columns: 220px 1fr 0px; }
+.app-body.chat-collapsed .chat-panel { min-width: 0; }
+.app-body.chat-collapsed .chat-panel-toggle { right: 0; }
+
+/* Sticky run bar */
+.run-bar {
+  position: sticky; bottom: 0; background: white;
+  border-top: 2px solid #e2e8f0; padding: 0.65rem 1.2rem;
+  display: flex; align-items: center; gap: 1rem; flex-shrink: 0;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06); z-index: 5;
+}
+
+/* Source badges for literature card */
+.src-badge { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.src-epmc { background: #dbeafe; color: #1d4ed8; }
+.src-pubmed { background: #dcfce7; color: #15803d; }
+.src-biorxiv { background: #fce7f3; color: #9d174d; }
+.src-badge-sm { font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 999px; }
+.method-extracted { background: #fffbeb; border-color: #fde68a !important; }
+.method-extracted .method-label { color: #92400e; }
+
+/* Horizontal method cards from paper extraction */
+.method-cards-scroll {
+  display: flex; gap: 0.75rem; overflow-x: auto;
+  padding: 0.25rem 0 0.75rem; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.method-cards-scroll::-webkit-scrollbar { height: 5px; }
+.method-cards-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.method-card {
+  flex: 0 0 210px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 0.85rem 0.9rem; background: white; scroll-snap-align: start;
+  display: flex; flex-direction: column; gap: 0.35rem; min-height: 180px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.method-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(37,99,235,0.1); }
+.method-card.card-added { border-color: #2563eb; background: #eff6ff; }
+.method-card-name { font-size: 0.85rem; font-weight: 700; color: #1e293b; line-height: 1.3; }
+.method-card-native { font-size: 0.65rem; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 0.1rem 0.45rem; border-radius: 999px; display: inline-block; width: fit-content; }
+.method-card-intention { font-size: 0.75rem; color: #374151; line-height: 1.4; flex: 1; }
+.method-card-insight { font-size: 0.72rem; color: #64748b; font-style: italic; line-height: 1.35; }
+.method-card-paper { font-size: 0.68rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: auto; padding-top: 0.3rem; border-top: 1px solid #f1f5f9; }
+.btn-add-card { padding: 0.28rem 0.6rem; font-size: 0.75rem; font-weight: 600; border: 1.5px solid #2563eb; border-radius: 6px; color: #2563eb; background: transparent; cursor: pointer; margin-top: 0.4rem; transition: background 0.12s, color 0.12s; }
+.btn-add-card:hover { background: #2563eb; color: white; }
+.card-added .btn-add-card { background: #2563eb; color: white; border-color: #2563eb; }
+
+/* @mention autocomplete popup */
+.mention-popup {
+  position: absolute; bottom: 100%; left: 0; right: 0; z-index: 999; background: white;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.12); max-height: 220px;
+  overflow-y: auto; display: none; flex-direction: column; margin-bottom: 4px;
+}
+.mention-popup.visible { display: flex; }
+.mention-opt {
+  padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer;
+  display: flex; align-items: center; gap: 0.5rem; color: #1e293b;
+}
+.mention-opt:hover, .mention-opt.selected { background: #eff6ff; }
+.mention-opt .mp-type { font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.35rem;
+  border-radius: 3px; flex-shrink: 0; }
+.mp-cluster { background: #1d4ed8; color: white; }
+.mp-method  { background: #15803d; color: white; }
+.mp-report  { background: #7e22ce; color: white; }
+.mention-opt .mp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <h1>BGCLens</h1>
-    <span>Post-processing &amp; interpretation for BGCFlow</span>
+  <h1>BGCLens</h1>
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchPage('p1')" id="tab-p1">Dashboard</button>
+    <button class="tab" onclick="switchPage('p2')" id="tab-p2">New Report</button>
   </div>
+  <span class="project-tag" id="project-tag">no project loaded</span>
 </header>
 
-<div class="container">
+<div class="app-body">
 
-  <!-- Step 1: Ingest -->
-  <div class="card" id="step-ingest">
-    <h2><span class="step-num">1</span> Load BGCFlow Project</h2>
-    <label for="project-path">BGCFlow project directory path</label>
-    <div class="flex-gap mt" style="margin-top:0.5rem">
-      <input type="text" id="project-path" placeholder="/path/to/bgcflow/data/processed/my_project" style="flex:1">
-      <button class="btn-primary" id="btn-load" onclick="loadProject()">Load Project</button>
+  <!-- Left: KB panel -->
+  <aside class="kb-panel">
+    <h2>Features / KB</h2>
+    <div class="kb-list" id="kb-list">
+      <div style="padding:0.5rem;font-size:0.75rem;color:#5a7a99;">Load a project to see @mention targets.</div>
     </div>
-    <div id="ingest-error" class="hidden"></div>
-    <div id="manifest-panel" class="hidden">
-      <div class="manifest-grid" id="manifest-grid"></div>
+  </aside>
+
+  <!-- Centre: page switcher -->
+  <div class="centre">
+
+    <!-- P1: Dashboard -->
+    <div class="page active" id="page-p1">
+
+      <!-- 1. Ingest -->
+      <div class="card" id="card-ingest">
+        <h3>&#128194; Load BGCFlow Project</h3>
+        <div class="input-row">
+          <input type="text" id="project-path" placeholder="/path/to/bgcflow/project" />
+          <button class="btn-primary" id="btn-load" onclick="loadProject()">Load</button>
+        </div>
+        <div id="ingest-status" class="hidden"></div>
+        <div id="manifest-info" class="hidden" style="margin-top:0.7rem;font-size:0.82rem;color:#475569;"></div>
+      </div>
+
+      <!-- 2. BGCFlow interactive report embed -->
+      <div class="card hidden" id="card-embed">
+        <h3>&#128202; BGCFlow Interactive Report</h3>
+        <div id="embed-container"></div>
+        <div id="embed-narrative" style="margin-top:0.6rem;font-size:0.82rem;color:#374151;"></div>
+      </div>
+
+      <!-- 3. Cluster profiles -->
+      <div class="card hidden" id="card-clusters">
+        <h3>&#129516; Cluster Profiles</h3>
+        <p style="font-size:0.75rem;color:#64748b;margin-bottom:0.6rem;">Novelty bands are banded priors from retrieval data — not predictions of correctness.</p>
+        <div class="cluster-grid" id="cluster-grid"></div>
+      </div>
+
+      <!-- 4. Analysis options -->
+      <div class="card hidden" id="card-analyses">
+        <h3>&#9879;&#65039; Analysis Options</h3>
+        <div class="method-list" id="method-list">
+          <label class="method-row">
+            <input type="checkbox" value="alpha_diversity" checked>
+            <span class="method-label">Alpha Diversity (Shannon, Simpson)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="manufacturability" checked>
+            <span class="method-label">Manufacturability Analysis (tractability + chassis hint)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="fisher_enrichment">
+            <span class="method-label">Enrichment Analysis (Fisher's Exact — BGC class)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="pcoa">
+            <span class="method-label">Principal Coordinates Analysis (PCoA)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="pca">
+            <span class="method-label">Principal Component Analysis (PCA)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="hierarchical_clustering">
+            <span class="method-label">Hierarchical Clustering (Ward / complete linkage)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="permanova">
+            <span class="method-label">PERMANOVA (group comparison of BGC distances)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="louvain_community">
+            <span class="method-label">Community Detection (Louvain — GCF network)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 4b. Paper search -->
+      <div class="card hidden" id="card-literature">
+        <h3>&#128196; Paper Search</h3>
+        <div class="input-row" style="margin-bottom:0.5rem;">
+          <input type="text" id="lit-query" placeholder="e.g. BGC biosynthetic gene cluster Streptomyces"
+            onkeydown="if(event.key==='Enter')searchLiterature()"/>
+          <button class="btn-primary" id="btn-lit" onclick="searchLiterature()">Search</button>
+        </div>
+        <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;flex-wrap:wrap;align-items:center;">
+          <span class="src-badge src-epmc">EuropePMC</span>
+          <span class="src-badge src-pubmed">PubMed</span>
+          <span class="src-badge src-biorxiv">bioRxiv</span>
+          <span style="font-size:0.7rem;color:#94a3b8;margin-left:auto;">top 8 per source</span>
+        </div>
+        <div id="lit-status" class="hidden" style="font-size:0.8rem;color:#64748b;margin-bottom:0.4rem;"></div>
+        <!-- Scrollable results area — grouped by source -->
+        <div id="lit-results" style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:0.75rem;padding-right:0.25rem;"></div>
+        <div id="lit-extract-bar" class="hidden" style="margin-top:0.7rem;padding-top:0.6rem;border-top:1px solid #f1f5f9;display:flex;align-items:center;gap:0.5rem;">
+          <button class="btn-primary btn-sm" onclick="extractMethods()" id="btn-extract">&#129302; Extract Methods</button>
+          <span id="extract-hint" style="font-size:0.75rem;color:#64748b;"></span>
+        </div>
+        <div id="extracted-methods" class="hidden" style="margin-top:0.6rem;">
+          <div style="font-size:0.8rem;font-weight:600;color:#92400e;margin-bottom:0.35rem;">&#128161; Methods found — scroll to explore, click <b>+ Add</b> to include in analysis:</div>
+          <div class="method-cards-scroll" id="method-cards"></div>
+          <!-- hidden checkboxes kept for runBatch() to collect added card methods -->
+          <div id="extracted-method-list" class="method-list" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- 5. Status board -->
+      <div class="card hidden" id="card-status">
+        <h3>&#9201; Analysis Status</h3>
+        <div class="status-board" id="status-board"></div>
+        <div class="flex-row" style="margin-top:0.7rem;" id="post-run-actions">
+        </div>
+      </div>
+
+    </div><!-- /P1 -->
+
+    <!-- P2: Report -->
+    <div class="page" id="page-p2">
+      <div class="card" id="card-report-view">
+        <h3>&#128196; BGCLens Report</h3>
+        <div id="report-status" style="font-size:0.82rem;color:#64748b;">Run analyses on the Dashboard first, then lock the report here.</div>
+        <div id="report-content" class="hidden"></div>
+        <div class="flex-row" style="margin-top:0.7rem;" id="report-actions"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Step 2: Intent + Topic -->
-  <div class="card hidden" id="step-intent">
-    <h2><span class="step-num">2</span> What do you want to analyse?</h2>
-    <div class="intent-grid" id="intent-grid"></div>
-    <label for="topic-input" style="margin-top:1rem">Describe your research question (used to find relevant literature)</label>
-    <textarea id="topic-input" rows="2" placeholder="e.g. Which BGC classes are enriched in the Streptomyces clade compared to Saccharopolyspora?"></textarea>
-    <div class="mt">
-      <button class="btn-primary" id="btn-recommend" onclick="getRecommendations()">Get Method Recommendations</button>
+    <!-- Sticky run bar -->
+    <div class="run-bar hidden" id="run-bar">
+      <div class="smoke-row" style="flex:1;gap:0.7rem;">
+        <span style="white-space:nowrap;font-size:0.82rem;font-weight:600;color:#1e3a5f;">Smoke round:</span>
+        <input type="range" id="smoke-n" min="1" max="10" value="3"
+          oninput="document.getElementById('smoke-val').textContent=this.value" style="flex:1;">
+        <span style="white-space:nowrap;font-size:0.82rem;"><b id="smoke-val">3</b> clusters</span>
+      </div>
+      <button class="btn-primary" id="btn-run" onclick="runBatch()" disabled>&#9654; Run Selected Analyses</button>
+      <span id="run-hint" style="font-size:0.78rem;color:#64748b;"></span>
     </div>
-    <div id="intent-error" class="hidden"></div>
-  </div>
 
-  <!-- Step 3: Method selection -->
-  <div class="card hidden" id="step-methods">
-    <h2><span class="step-num">3</span> Choose Analysis Method</h2>
-    <div id="method-list"></div>
-    <div class="mt">
-      <button class="btn-primary" id="btn-run" onclick="runAnalysis()">Run Analysis</button>
+  </div><!-- /centre -->
+
+  <!-- Right: persistent chat -->
+  <aside class="chat-panel">
+    <h2>Chat <span style="margin-left:auto;cursor:pointer;opacity:0.6;font-size:0.85rem;" onclick="toggleChat()" title="Collapse chat">✕</span></h2>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg msg-assistant">Hello! Load a project and run analyses, then ask me questions grounded in the results. Use @mention a cluster or method to scope your question.</div>
     </div>
-    <div id="method-error" class="hidden"></div>
-  </div>
+    <div class="chat-input-area" style="position:relative;">
+      <div id="mention-popup" class="mention-popup"></div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" placeholder="Ask anything… type @ to mention a cluster or method" rows="1"
+          oninput="onChatInput(event)"
+          onkeydown="onChatKeydown(event)"></textarea>
+        <button class="btn-primary btn-sm" onclick="sendChat()">Send</button>
+      </div>
+      <div class="chat-hint">Type @ to mention a cluster or method · Ask any biology or analysis question</div>
+    </div>
+  </aside>
 
-  <!-- Step 4: Result -->
-  <div class="card hidden" id="step-result">
-    <h2><span class="step-num">4</span> Result</h2>
-    <div id="result-content"></div>
-  </div>
+<!-- Fixed panel toggles — outside grid so overflow:hidden never clips them -->
+<div class="panel-toggle kb-panel-toggle" id="kb-toggle-btn" onclick="toggleKB()" title="Toggle KB panel">‹</div>
+<div class="panel-toggle chat-panel-toggle" id="chat-toggle-btn" onclick="toggleChat()" title="Toggle chat">›</div>
 
-</div>
+</div><!-- /app-body -->
 
 <script>
+// ── Minimal markdown renderer ─────────────────────────────────────────────────
+function renderMarkdown(text) {
+  if (!text) return '';
+  let s = text
+    // Fix literal \n sequences from LLM
+    .replace(/\\n/g, '\n')
+    // Escape HTML entities first
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Headers
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    // Bold + italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Bullet lists — collect consecutive lines
+    .replace(/((?:^[-*] .+\n?)+)/gm, m => '<ul>' + m.replace(/^[-*] (.+)$/gm, '<li>$1</li>') + '</ul>')
+    // Numbered lists
+    .replace(/((?:^\d+\. .+\n?)+)/gm, m => '<ol>' + m.replace(/^\d+\. (.+)$/gm, '<li>$1</li>') + '</ol>')
+    // Horizontal rule
+    .replace(/^---+$/gm, '<hr>')
+    // Paragraphs: double newlines → <p>
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => {
+      if (p.startsWith('<h') || p.startsWith('<ul') || p.startsWith('<ol') || p.startsWith('<hr')) return p;
+      // Single newlines within a paragraph → <br>
+      return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+    })
+    .join('\n');
+  return s;
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
-let state = {
+const state = {
   projectPath: null,
-  manifest: null,
-  intents: [],
-  selectedIntent: null,
-  recommendations: [],
-  selectedMethod: null,
+  clusters: [],
+  runIds: [],
+  lockedPath: null,
+  chatHistory: [],
+  kbObjects: [],
 };
 
-// ── API helpers ──────────────────────────────────────────────────────────────
-async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(path, opts);
-  const json = await r.json();
-  if (!r.ok) throw new Error(json.detail || 'API error');
-  return json;
+// ── Page switching ───────────────────────────────────────────────────────────
+function switchPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  document.getElementById('tab-' + p).classList.add('active');
 }
 
-// ── Step 1: Ingest ───────────────────────────────────────────────────────────
+// ── Load project ─────────────────────────────────────────────────────────────
 async function loadProject() {
   const path = document.getElementById('project-path').value.trim();
-  if (!path) return showError('ingest-error', 'Please enter a project path.');
-
+  if (!path) return;
   const btn = document.getElementById('btn-load');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Loading&hellip;';
-  hideError('ingest-error');
+  btn.innerHTML = '<span class="spinner"></span>';
+  const statusEl = document.getElementById('ingest-status');
+  statusEl.className = 'alert alert-info';
+  statusEl.textContent = 'Loading project…';
+  statusEl.classList.remove('hidden');
 
   try {
-    const data = await api('POST', '/api/open', { path });
+    const res = await fetch('/api/open', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Load failed');
+
     state.projectPath = path;
-    state.manifest = data;
-    showManifest(data);
-    await loadIntents();
-    show('step-intent');
+    document.getElementById('project-tag').textContent = 'project: ' + data.project_name;
+    document.getElementById('manifest-info').innerHTML =
+      `<b>${data.gcf_count}</b> GCFs · <b>${data.genome_count}</b> genomes · pipelines: ${(data.available_pipelines||[]).join(', ')||'none'}`;
+    document.getElementById('manifest-info').classList.remove('hidden');
+    statusEl.className = 'alert alert-info';
+    statusEl.textContent = '✔ Project loaded.';
+
+    await Promise.all([loadEmbedReport(data), loadClusters(), loadKB()]);
+    document.getElementById('card-embed').classList.remove('hidden');
+    document.getElementById('card-clusters').classList.remove('hidden');
+    document.getElementById('card-analyses').classList.remove('hidden');
+    document.getElementById('card-literature').classList.remove('hidden');
+    document.getElementById('btn-run').disabled = false;
+    document.getElementById('run-bar').classList.remove('hidden');
   } catch(e) {
-    showError('ingest-error', e.message);
+    statusEl.className = 'alert alert-error';
+    statusEl.textContent = '✖ ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Load Project';
+    btn.textContent = 'Load';
   }
 }
 
-function showManifest(m) {
-  const grid = document.getElementById('manifest-grid');
-  grid.innerHTML = [
-    ['Project', m.project_name],
-    ['Genomes', m.genome_count],
-    ['GCFs', m.gcf_count],
-    ['Pipelines', m.available_pipelines.join(', ') || 'none'],
-  ].map(([l, v]) => `<div class="manifest-item"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
-  show('manifest-panel');
+// ── BGCFlow embed ─────────────────────────────────────────────────────────────
+async function loadEmbedReport(manifest) {
+  const ec = document.getElementById('embed-container');
+  // Try conventional BGCFlow report path
+  const reportUrl = manifest.source_path ? manifest.source_path + '/quarto/index.html' : null;
+  if (reportUrl) {
+    ec.innerHTML = `<iframe class="bgcflow-embed" src="${reportUrl}" sandbox="allow-scripts allow-same-origin"></iframe>`;
+  } else {
+    ec.innerHTML = `<div class="embed-placeholder">BGCFlow interactive report not found at the conventional path (<code>quarto/index.html</code>). Proceeding without embed — all BGCLens analyses available below.</div>`;
+  }
 }
 
-// ── Step 2: Intents ──────────────────────────────────────────────────────────
-async function loadIntents() {
-  const data = await api('GET', '/api/intents');
-  state.intents = data.intents;
-  const grid = document.getElementById('intent-grid');
-  grid.innerHTML = data.intents.map(i => `
-    <label class="intent-card" onclick="selectIntent('${i.value}', this)">
-      <input type="radio" name="intent" value="${i.value}">
-      <div class="intent-label">${i.label}</div>
-      <div class="intent-desc">${i.description}</div>
-    </label>`).join('');
+// ── Clusters ──────────────────────────────────────────────────────────────────
+async function loadClusters() {
+  if (!state.projectPath) return;
+  const res = await fetch('/api/clusters?path=' + encodeURIComponent(state.projectPath));
+  const data = await res.json();
+  state.clusters = data.clusters || [];
+  renderClusters();
 }
 
-function selectIntent(value, el) {
-  document.querySelectorAll('.intent-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  state.selectedIntent = value;
+function renderClusters() {
+  const grid = document.getElementById('cluster-grid');
+  grid.innerHTML = '';
+  const display = state.clusters.slice(0, 30);
+  for (const c of display) {
+    const band = c.novelty_band || 'low';
+    const bandClass = 'band-' + band.replace(/\s+/g, '-');
+    grid.innerHTML += `
+      <div class="cluster-card" onclick="mentionCluster('${c.cluster_id}')">
+        <div class="cluster-id">${c.cluster_id}</div>
+        <div class="cluster-type">${c.cluster_type || 'unknown'} · ${c.organism || '—'}</div>
+        <span class="band-chip ${bandClass}">${band}</span>
+      </div>`;
+  }
+  if (state.clusters.length > 30) {
+    grid.innerHTML += `<div style="font-size:0.75rem;color:#64748b;padding:0.5rem;">+${state.clusters.length-30} more</div>`;
+  }
 }
 
-async function getRecommendations() {
-  if (!state.selectedIntent) return showError('intent-error', 'Please choose an analysis intent.');
-  const topic = document.getElementById('topic-input').value.trim() || 'BGC analysis';
+function mentionCluster(id) {
+  const inp = document.getElementById('chat-input');
+  inp.value = '@' + id + ' ';
+  inp.focus();
+}
 
-  const btn = document.getElementById('btn-recommend');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Getting recommendations&hellip;';
-  hideError('intent-error');
+// ── KB panel ──────────────────────────────────────────────────────────────────
+async function loadKB() {
+  if (!state.projectPath) return;
+  const res = await fetch('/api/kb?path=' + encodeURIComponent(state.projectPath));
+  const data = await res.json();
+  state.kbObjects = data.objects || [];
+  renderKB();
+}
+
+function renderKB() {
+  const list = document.getElementById('kb-list');
+  list.innerHTML = '';
+  for (const obj of state.kbObjects.slice(0, 60)) {
+    const typeClass = obj.type === 'cluster' ? 'kb-type-cluster' : obj.type === 'method' ? 'kb-type-method' : 'kb-type-report';
+    const typeLabel = obj.type === 'cluster' ? 'C' : obj.type === 'method' ? 'M' : 'R';
+    list.innerHTML += `
+      <div class="kb-item" onclick="insertMention('${obj.id}')" title="@${obj.id}">
+        <span class="kb-type ${typeClass}">${typeLabel}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${obj.label}</span>
+      </div>`;
+  }
+}
+
+function insertMention(id) {
+  const inp = document.getElementById('chat-input');
+  inp.value += '@' + id + ' ';
+  inp.focus();
+}
+
+// ── Run batch ─────────────────────────────────────────────────────────────────
+async function runBatch() {
+  if (!state.projectPath) return;
+
+  // Collect from native method list + extracted method list (hidden checkboxes synced by toggleMethodCard)
+  const checked = [
+    ...document.querySelectorAll('#method-list input[type=checkbox]:checked'),
+    ...document.querySelectorAll('#extracted-method-list input[type=checkbox]:checked'),
+  ];
+  // Also treat added cards that have a bgclens_id as checked
+  document.querySelectorAll('.method-card.card-added').forEach(card => {
+    const mid = card.dataset.methodId;
+    if (mid && !checked.some(cb => cb.value === mid)) {
+      const el = document.createElement('input');
+      el.value = mid;
+      checked.push(el);
+    }
+  });
+
+  if (!checked.length) { alert('Select at least one analysis method.'); return; }
+
+  const methodIds = checked.map(el => el.value);
+  const smokeN = parseInt(document.getElementById('smoke-n').value, 10);
+
+  document.getElementById('card-status').classList.remove('hidden');
+  const board = document.getElementById('status-board');
+  board.innerHTML = '';
+  const statusRows = {};
+
+  // Create placeholder rows
+  for (const mid of methodIds) {
+    statusRows[mid] = document.createElement('div');
+    statusRows[mid].className = 'status-row s-queued';
+    statusRows[mid].innerHTML = `<span class="status-dot"></span><span class="status-label">${mid} — queued (up to ${smokeN} clusters)</span>`;
+    board.appendChild(statusRows[mid]);
+  }
+
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('run-hint').textContent = 'Running…';
 
   try {
-    const data = await api('POST', '/api/recommend', {
-      path: state.projectPath,
-      intent: state.selectedIntent,
-      topic,
-      use_literature: false,
-    });
+    // Set method rows to running
+    for (const mid of methodIds) {
+      statusRows[mid].className = 'status-row s-running';
+      statusRows[mid].querySelector('.status-label').textContent = `${mid} — running…`;
+    }
 
-    if (!data.valid) {
-      showError('intent-error', data.suggestion || 'Intent not compatible with available data.');
+    const res = await fetch('/api/run-batch', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        path: state.projectPath,
+        method_ids: methodIds,
+        cluster_ids: null,  // auto smoke round
+        use_llm: true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Batch run failed');
+
+    state.runIds = data.run_ids || [];
+
+    // Mark all as success or fail per result
+    board.innerHTML = '';
+    for (const r of (data.results || [])) {
+      const cid = r._cluster_id || '?';
+      const mid = r.method || r._method_id || '?';
+      const err = r._error;
+      const row = document.createElement('div');
+      row.className = 'status-row ' + (err ? 's-failed' : 's-success');
+      row.innerHTML = `<span class="status-dot"></span><span class="status-label">${mid} @ ${cid}${err ? ': ' + err : ''}</span>`;
+      board.appendChild(row);
+    }
+
+    document.getElementById('run-hint').textContent = `✔ ${data.results?.length || 0} tasks completed. ${state.runIds.length} records saved.`;
+
+    // Show post-run actions
+    document.getElementById('post-run-actions').innerHTML = `
+      <button class="btn-success btn-sm" onclick="renderLockReport(event)">Render &amp; Lock Report</button>
+      <button class="btn-primary btn-sm" onclick="switchPage('p2')">View Report →</button>
+    `;
+
+    // Refresh KB
+    await loadKB();
+  } catch(e) {
+    document.getElementById('run-hint').textContent = '✖ ' + e.message;
+    board.innerHTML += `<div class="status-row s-failed"><span class="status-dot"></span><span class="status-label">${e.message}</span></div>`;
+  } finally {
+    document.getElementById('btn-run').disabled = false;
+  }
+}
+
+// ── Render + lock report ──────────────────────────────────────────────────────
+async function renderLockReport(event) {
+  if (!state.runIds.length) { alert('Run analyses first.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Rendering…';
+
+  try {
+    const res = await fetch('/api/report/lock', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({run_ids: state.runIds, wrap_rocrate: false}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Lock failed');
+
+    state.lockedPath = data.locked_path || data.qmd_path;
+
+    // Switch to P2 and show report
+    switchPage('p2');
+    const content = document.getElementById('report-content');
+    content.classList.remove('hidden');
+    document.getElementById('report-status').classList.add('hidden');
+
+    let html = '';
+    let downloadBtn = '';
+    if (data.html_b64) {
+      const htmlBytes = atob(data.html_b64);
+      const blob = new Blob([htmlBytes], {type:'text/html'});
+      const blobUrl = URL.createObjectURL(blob);
+      html = `<iframe class="report-iframe" src="${blobUrl}"></iframe>`;
+      downloadBtn = `<a href="${blobUrl}" download="bgclens-report.html" class="btn-primary btn-sm">⬇ Download HTML</a>`;
+    } else {
+      html = `<div class="alert alert-info">Report generated but HTML not available.</div>`;
+    }
+
+    const lockedInfo = data.locked_path ? `<div class="locked-badge">🔒 Immutable: ${data.locked_path.split('/').pop()}</div>` : '';
+    content.innerHTML = html + lockedInfo;
+
+    document.getElementById('report-actions').innerHTML = `
+      ${downloadBtn}
+      <button class="btn-lock btn-sm" onclick="wrapRoCrate()">Wrap RO-Crate</button>
+    `;
+  } catch(e) {
+    document.getElementById('report-status').textContent = '✖ ' + e.message;
+    document.getElementById('report-status').className = 'alert alert-error';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Render & Lock Report';
+  }
+}
+
+async function wrapRoCrate() {
+  if (!state.runIds.length) return;
+  const res = await fetch('/api/report/lock', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({run_ids: state.runIds, wrap_rocrate: true}),
+  });
+  const data = await res.json();
+  if (data.rocrate_path) {
+    document.getElementById('report-actions').innerHTML += `<span class="alert alert-info" style="padding:0.3rem 0.6rem;">RO-Crate: ${data.rocrate_path.split('/').pop()}</span>`;
+  } else {
+    alert('RO-Crate wrap failed (non-fatal) — rocrate package may not be installed.');
+  }
+}
+
+// ── @mention autocomplete ─────────────────────────────────────────────────────
+const _mentionState = { open: false, query: '', atPos: -1, idx: 0 };
+
+function _mentionItems(query) {
+  const q = query.toLowerCase();
+  return state.kbObjects
+    .filter(o => !q || o.id.toLowerCase().includes(q) || (o.label||'').toLowerCase().includes(q))
+    .slice(0, 12);
+}
+
+function _renderMentionPopup(items) {
+  const popup = document.getElementById('mention-popup');
+  if (!items.length) { _closeMentionPopup(); return; }
+  popup.innerHTML = items.map((o, i) => {
+    const typeClass = o.type === 'cluster' ? 'mp-cluster' : o.type === 'method' ? 'mp-method' : 'mp-report';
+    return `<div class="mention-opt${i === _mentionState.idx ? ' selected' : ''}" data-id="${o.id}" onclick="_pickMention('${o.id}')">
+      <span class="mp-type ${typeClass}">${o.type}</span>
+      <span class="mp-label">${o.id}</span>
+    </div>`;
+  }).join('');
+
+  popup.classList.add('visible');
+  _mentionState.open = true;
+}
+
+function _closeMentionPopup() {
+  document.getElementById('mention-popup').classList.remove('visible');
+  _mentionState.open = false;
+  _mentionState.atPos = -1;
+}
+
+function _pickMention(id) {
+  const inp = document.getElementById('chat-input');
+  const val = inp.value;
+  const before = val.slice(0, _mentionState.atPos);
+  const after = val.slice(_mentionState.atPos + 1 + _mentionState.query.length);
+  inp.value = before + '@' + id + ' ' + after;
+  inp.focus();
+  const pos = before.length + id.length + 2;
+  inp.setSelectionRange(pos, pos);
+  _closeMentionPopup();
+}
+
+function onChatInput(e) {
+  const inp = e.target;
+  const val = inp.value;
+  const caret = inp.selectionStart;
+
+  // Find last @ before caret
+  const textBeforeCaret = val.slice(0, caret);
+  const atIdx = textBeforeCaret.lastIndexOf('@');
+  if (atIdx !== -1) {
+    const fragment = textBeforeCaret.slice(atIdx + 1);
+    // Only trigger if no space in fragment (we're still typing the mention)
+    if (!fragment.includes(' ')) {
+      _mentionState.atPos = atIdx;
+      _mentionState.query = fragment;
+      _mentionState.idx = 0;
+      const items = _mentionItems(fragment);
+      if (items.length) { _renderMentionPopup(items); return; }
+    }
+  }
+  _closeMentionPopup();
+}
+
+function onChatKeydown(e) {
+  if (_mentionState.open) {
+    const items = _mentionItems(_mentionState.query);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _mentionState.idx = Math.min(_mentionState.idx + 1, items.length - 1);
+      _renderMentionPopup(items); return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _mentionState.idx = Math.max(_mentionState.idx - 1, 0);
+      _renderMentionPopup(items); return;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (items[_mentionState.idx]) {
+        e.preventDefault();
+        _pickMention(items[_mentionState.idx].id); return;
+      }
+    }
+    if (e.key === 'Escape') { _closeMentionPopup(); return; }
+  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg || !state.projectPath) {
+    if (!state.projectPath) appendMsg('assistant', 'Please load a project first.');
+    return;
+  }
+  inp.value = '';
+  _closeMentionPopup();
+
+  appendMsg('user', msg);
+  state.chatHistory.push({role: 'user', content: msg});
+
+  const placeholder = appendMsg('assistant', '…');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        path: state.projectPath,
+        run_ids: state.runIds,
+        message: msg,
+        history: state.chatHistory.slice(-6),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Chat failed');
+    const reply = data.reply || 'No response.';
+    placeholder.innerHTML = renderMarkdown(reply);
+    state.chatHistory.push({role: 'assistant', content: reply});
+  } catch(e) {
+    placeholder.textContent = '✖ ' + e.message;
+  }
+}
+
+function appendMsg(role, content) {
+  const msgs = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = 'msg msg-' + role;
+  if (role === 'assistant') {
+    el.innerHTML = renderMarkdown(content);
+  } else {
+    el.textContent = content;
+  }
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  return el;
+}
+
+// ── KB sidebar toggle ─────────────────────────────────────────────────────────
+function toggleKB() {
+  const body = document.querySelector('.app-body');
+  body.classList.toggle('kb-collapsed');
+  document.getElementById('kb-toggle-btn').textContent = body.classList.contains('kb-collapsed') ? '›' : '‹';
+}
+function toggleChat() {
+  const body = document.querySelector('.app-body');
+  body.classList.toggle('chat-collapsed');
+  document.getElementById('chat-toggle-btn').textContent = body.classList.contains('chat-collapsed') ? '‹' : '›';
+}
+
+// ── Literature / paper search ─────────────────────────────────────────────────
+let litPapers = [];  // store for extract-methods
+
+function _renderPaper(r, idx) {
+  const authors = (r.authors || []).slice(0, 3).join(', ') + ((r.authors?.length > 3) ? ' et al.' : '');
+  const link = r.url ? `<a href="${r.url}" target="_blank" style="color:#2563eb;font-size:0.75rem;text-decoration:none;">↗</a>` : '';
+  const srcClass = r.source === 'pubmed' ? 'src-pubmed' : r.source === 'biorxiv' ? 'src-biorxiv' : 'src-epmc';
+  const srcLabel = r.source === 'pubmed' ? 'PubMed' : r.source === 'biorxiv' ? 'bioRxiv' : 'EuropePMC';
+  return `<label style="border:1px solid #e2e8f0;border-radius:7px;padding:0.5rem 0.7rem;background:white;display:flex;gap:0.5rem;cursor:pointer;transition:border-color 0.12s;"
+    onmouseenter="this.style.borderColor='#93c5fd'" onmouseleave="this.style.borderColor='#e2e8f0'">
+    <input type="checkbox" class="paper-select" data-idx="${idx}"
+      style="margin-top:0.2rem;flex-shrink:0;width:1rem;height:1rem;cursor:pointer;"
+      onchange="updateExtractBar()">
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:flex-start;gap:0.4rem;margin-bottom:0.15rem;">
+        <span class="src-badge-sm ${srcClass}" style="flex-shrink:0;margin-top:0.1rem;">${srcLabel}</span>
+        <span style="font-size:0.82rem;font-weight:600;color:#1e293b;flex:1;line-height:1.3;">${r.title || '(no title)'}</span>
+        ${link}
+      </div>
+      <div style="font-size:0.72rem;color:#64748b;">${authors}${r.year ? ' · ' + r.year : ''}</div>
+      ${r.abstract ? `<div style="font-size:0.74rem;color:#374151;margin-top:0.2rem;line-height:1.4;">${r.abstract}</div>` : ''}
+    </div>
+  </label>`;
+}
+
+function updateExtractBar() {
+  const checked = document.querySelectorAll('.paper-select:checked');
+  const bar = document.getElementById('lit-extract-bar');
+  const btn = document.getElementById('btn-extract');
+  if (bar) bar.classList.toggle('hidden', checked.length === 0);
+  if (btn) btn.textContent = `🤖 Extract Methods from ${checked.length} Paper${checked.length !== 1 ? 's' : ''}`;
+}
+
+async function searchLiterature() {
+  const query = document.getElementById('lit-query').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('btn-lit');
+  const statusEl = document.getElementById('lit-status');
+  const resultsEl = document.getElementById('lit-results');
+  const extractBar = document.getElementById('lit-extract-bar');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = 'Searching EuropePMC, PubMed, and bioRxiv…';
+  statusEl.classList.remove('hidden');
+  resultsEl.innerHTML = '';
+  extractBar.classList.add('hidden');
+  document.getElementById('extracted-methods').classList.add('hidden');
+  litPapers = [];
+
+  try {
+    const res = await fetch('/api/literature', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, max_results: 24}),  // 8 per source × 3
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Search failed');
+
+    litPapers = data.results || [];
+    const total = data.total || litPapers.length;
+    statusEl.textContent = `${total} result${total !== 1 ? 's' : ''} across ${(data.sources_searched || []).length} sources`;
+
+    if (!litPapers.length) {
+      resultsEl.innerHTML = '<div style="font-size:0.8rem;color:#64748b;padding:0.5rem;">No results found.</div>';
       return;
     }
-    state.recommendations = data.recommendations;
-    state.selectedMethod = data.recommendations.find(r => r.is_recommended)?.method_id || data.recommendations[0]?.method_id;
-    renderMethods(data.recommendations);
-    show('step-methods');
+
+    // Group by source — 8 per source displayed
+    const sourceOrder = ['europepmc', 'pubmed', 'biorxiv'];
+    const sourceLabel = {europepmc: 'EuropePMC', pubmed: 'PubMed / NCBI', biorxiv: 'bioRxiv preprints'};
+    const sourceCls   = {europepmc: 'src-epmc',  pubmed: 'src-pubmed',    biorxiv: 'src-biorxiv'};
+    const grouped = {};
+    for (const r of litPapers) { (grouped[r.source] = grouped[r.source] || []).push(r); }
+
+    let html = '';
+    let globalIdx = 0;
+    for (const src of sourceOrder) {
+      const papers = (grouped[src] || []).slice(0, 8);
+      if (!papers.length) continue;
+      html += `<div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
+          <span class="src-badge ${sourceCls[src]}">${sourceLabel[src]}</span>
+          <span style="font-size:0.7rem;color:#94a3b8;">${papers.length} result${papers.length!==1?'s':''}</span>
+          <span style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">☑ check to include in extraction</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.35rem;">
+          ${papers.map((r) => _renderPaper(r, globalIdx++)).join('')}
+        </div>
+      </div>`;
+    }
+    resultsEl.innerHTML = html;
+    updateExtractBar();
   } catch(e) {
-    showError('intent-error', e.message);
+    statusEl.textContent = '✖ ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Get Method Recommendations';
+    btn.textContent = 'Search';
   }
 }
 
-// ── Step 3: Methods ──────────────────────────────────────────────────────────
-function renderMethods(recs) {
-  const list = document.getElementById('method-list');
-  list.innerHTML = recs.map(r => {
-    const costClass = {'Safe':'badge-safe','Heavy':'badge-heavy','Likely-to-fail':'badge-fail'}[r.cost_class] || 'badge-safe';
-    const litClass = {'strong':'badge-lit-strong','moderate':'badge-lit-moderate','weak':'badge-lit-none'}[r.literature_support] || 'badge-lit-none';
-    const litLabel = r.literature_support === 'unknown' ? '' : `Literature: ${r.literature_support}`;
-    const warnings = r.assumption_warnings.map(w => `<div class="warning-item">&#9888; ${w}</div>`).join('');
-    const recTag = r.is_recommended ? '<span class="rec-tag">&#10003; Recommended</span>' : '';
-    return `
-      <div class="method-card ${r.is_recommended ? 'recommended' : ''} ${state.selectedMethod === r.method_id ? 'selected' : ''}"
-           id="mcard-${r.method_id}" onclick="selectMethod('${r.method_id}')">
-        <div class="method-header">
-          <span class="method-name">${r.method_name}</span>
-          ${recTag}
-          <span class="badge ${costClass}">${r.cost_class}</span>
-          ${litLabel ? `<span class="badge ${litClass}">${litLabel}</span>` : ''}
-        </div>
-        <div style="font-size:0.78rem;color:#64748b;margin-top:0.3rem">${r.cost_reason}</div>
-        <div class="warning-list">${warnings}</div>
-      </div>`;
-  }).join('');
+function toggleMethodCard(btn) {
+  const card = btn.closest('.method-card');
+  card.classList.toggle('card-added');
+  const added = card.classList.contains('card-added');
+  btn.textContent = added ? '✓ Added' : '+ Add to Analysis';
+
+  // Sync a hidden checkbox so runBatch() can find it
+  const methodId = card.dataset.methodId;
+  const methodName = card.dataset.methodName;
+  if (methodId) {
+    const list = document.getElementById('extracted-method-list');
+    let existing = list.querySelector(`input[value="${CSS.escape(methodId)}"]`);
+    if (!existing) {
+      const lbl = document.createElement('label');
+      lbl.className = 'method-row method-extracted';
+      lbl.innerHTML = `<input type="checkbox" value="${methodId}"><span class="method-label">${methodName}</span>`;
+      list.appendChild(lbl);
+      existing = lbl.querySelector('input');
+    }
+    existing.checked = added;
+    // Sync native method checkbox if it already exists in the main list
+    const nativeEl = document.querySelector(`#method-list input[value="${CSS.escape(methodId)}"]`);
+    if (nativeEl) nativeEl.checked = added;
+  }
 }
 
-function selectMethod(methodId) {
-  state.selectedMethod = methodId;
-  document.querySelectorAll('.method-card').forEach(c => c.classList.remove('selected'));
-  const card = document.getElementById('mcard-' + methodId);
-  if (card) card.classList.add('selected');
-}
-
-// ── Step 4: Run ──────────────────────────────────────────────────────────────
-async function runAnalysis() {
-  if (!state.selectedMethod) return showError('method-error', 'Please select a method.');
-
-  const btn = document.getElementById('btn-run');
+async function extractMethods() {
+  const checkedBoxes = [...document.querySelectorAll('.paper-select:checked')];
+  if (!checkedBoxes.length) return;
+  const btn = document.getElementById('btn-extract');
+  const hint = document.getElementById('extract-hint');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Running analysis&hellip;';
-  hideError('method-error');
+  btn.innerHTML = '<span class="spinner"></span> Extracting…';
+  hint.textContent = '';
+
+  // Collect full paper objects by index
+  const selected = checkedBoxes
+    .map(cb => litPapers[parseInt(cb.dataset.idx)])
+    .filter(Boolean);
 
   try {
-    const data = await api('POST', '/api/run', {
-      path: state.projectPath,
-      method_id: state.selectedMethod,
-      params: {},
-      use_llm: true,
+    const res = await fetch('/api/literature/extract-methods', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        papers: selected.map(p => ({
+          title: p.title || '',
+          abstract: p.abstract || '',
+          doi: p.doi || '',
+          pmid: p.pmid || '',
+          url: p.url || '',
+          source: p.source || '',
+        })),
+        abstracts: selected.map(p => p.abstract || p.title || ''),
+        titles: selected.map(p => p.title || ''),
+      }),
     });
-    renderResult(data);
-    show('step-result');
-    document.getElementById('step-result').scrollIntoView({ behavior: 'smooth' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Extraction failed');
+
+    const methods = data.methods || [];
+    if (!methods.length) {
+      hint.textContent = 'No methods detected — try selecting papers with richer abstracts.';
+      return;
+    }
+
+    const cardsContainer = document.getElementById('method-cards');
+    cardsContainer.innerHTML = '';
+    document.getElementById('extracted-method-list').innerHTML = '';
+
+    for (const m of methods) {
+      const name = m.method_name || 'Unknown Method';
+      const bgclensId = m.bgclens_id || '';
+      const nativeBadge = bgclensId
+        ? `<span class="method-card-native">BGCLens native</span>` : '';
+      const intention = m.intention || '';
+      const insight = m.insight || '';
+      const paperTitle = m.paper_title || '';
+
+      const card = document.createElement('div');
+      card.className = 'method-card';
+      card.dataset.methodId = bgclensId;
+      card.dataset.methodName = name;
+      card.innerHTML = `
+        <div class="method-card-name">${name}</div>
+        ${nativeBadge}
+        <div class="method-card-intention">${intention}</div>
+        <div class="method-card-insight">${insight}</div>
+        <div class="method-card-paper" title="${paperTitle}">${paperTitle}</div>
+        <button class="btn-add-card" onclick="toggleMethodCard(this)">+ Add to Analysis</button>`;
+      cardsContainer.appendChild(card);
+    }
+
+    document.getElementById('extracted-methods').classList.remove('hidden');
+    hint.textContent = `${methods.length} method${methods.length !== 1 ? 's' : ''} found across ${selected.length} paper${selected.length !== 1 ? 's' : ''}.`;
   } catch(e) {
-    showError('method-error', e.message);
+    hint.textContent = '✖ ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Run Analysis';
+    updateExtractBar();
   }
 }
 
-function renderResult(data) {
-  const warnings = (data.assumption_warnings || [])
-    .map(w => `<div class="alert alert-warn">&#9888; ${w}</div>`).join('');
-
-  const llmBadge = data.llm_used
-    ? '<span class="llm-badge">&#10024; Interpretation enhanced by LLM</span>'
-    : '';
-
-  const figureHtml = data.figure_svg_b64
-    ? `<div class="figure-container">
-         <img src="data:image/svg+xml;base64,${data.figure_svg_b64}" alt="Analysis figure">
-       </div>`
-    : '<div class="alert alert-info">Figure not available for this method.</div>';
-
-  const interpretation = renderMarkdown(data.interpretation || '');
-
-  const pngHref = data.figure_png_b64
-    ? `data:image/png;base64,${data.figure_png_b64}`
-    : null;
-  const svgHref = data.figure_svg_b64
-    ? `data:image/svg+xml;base64,${data.figure_svg_b64}`
-    : null;
-
-  const downloadBtns = [
-    pngHref ? `<a href="${pngHref}" download="bgclens_figure.png"><button class="btn-download">&#11015; PNG</button></a>` : '',
-    svgHref ? `<a href="${svgHref}" download="bgclens_figure.svg"><button class="btn-download" style="background:#0369a1">&#11015; SVG</button></a>` : '',
-  ].join('');
-
-  document.getElementById('result-content').innerHTML = `
-    ${warnings}
-    ${figureHtml}
-    <div class="download-row">${downloadBtns}</div>
-    <div class="result-section">
-      <div class="flex-gap" style="margin-bottom:0.75rem">
-        <strong>Interpretation</strong> ${llmBadge}
-      </div>
-      <div class="interpretation">${interpretation}</div>
-    </div>
-  `;
-}
-
-// ── Simple Markdown renderer ─────────────────────────────────────────────────
-function renderMarkdown(md) {
-  return md
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/((<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hup])/gm, '')
-    .replace(/\n/g, '<br>')
-    .replace(/^(.+)$/gm, (_, p) => p.startsWith('<') ? p : `<p>${p}</p>`);
-}
-
-// ── Utilities ────────────────────────────────────────────────────────────────
-function show(id) { document.getElementById(id).classList.remove('hidden'); }
-function hide(id) { document.getElementById(id).classList.add('hidden'); }
-function showError(id, msg) {
-  const el = document.getElementById(id);
-  el.className = 'alert alert-error';
-  el.textContent = '✖ ' + msg;
-  el.classList.remove('hidden');
-}
-function hideError(id) { document.getElementById(id).classList.add('hidden'); }
+// Close mention popup when clicking outside the chat area
+document.addEventListener('click', e => {
+  if (!e.target.closest('.chat-input-area') && !e.target.closest('#mention-popup')) {
+    _closeMentionPopup();
+  }
+});
 </script>
-
 </body>
 </html>

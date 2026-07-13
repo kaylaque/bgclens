@@ -26,6 +26,7 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
     "matplotlib>=3.9",
+    "markdown>=3.10.2",
 ]
 
 [project.optional-dependencies]

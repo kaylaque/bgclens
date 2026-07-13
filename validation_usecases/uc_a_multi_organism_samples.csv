@@ -1,0 +1,7 @@
+genome_id,source,organism,genus,species,strain,closest_placement_reference
+GCF_000203835.1,ncbi,Streptomyces coelicolor A3(2),Streptomyces,coelicolor,A3(2),
+GCF_000009765.2,ncbi,Streptomyces avermitilis MA-4680,Streptomyces,avermitilis,MA-4680,
+GCF_000171635.1,ncbi,Saccharopolyspora erythraea NRRL 2338,Saccharopolyspora,erythraea,NRRL 2338,
+GCF_000196835.1,ncbi,Amycolatopsis mediterranei U32,Amycolatopsis,mediterranei,U32,
+GCF_000009045.1,ncbi,Bacillus subtilis subsp. subtilis 168,Bacillus,subtilis,168,
+GCF_000012685.1,ncbi,Myxococcus xanthus DK 1622,Myxococcus,xanthus,DK 1622,

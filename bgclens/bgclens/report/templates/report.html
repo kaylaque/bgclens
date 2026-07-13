@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BGCLens Report — {{ project_name }}</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0;
+  --text: #1e293b; --muted: #64748b; --accent: #1e3a5f;
+  --green: #15803d; --amber: #92400e; --purple: #7e22ce; --red: #991b1b;
+  --band-high: #dbeafe; --band-high-text: #1d4ed8;
+  --band-medium: #fef9c3; --band-medium-text: #a16207;
+  --band-low: #f1f5f9; --band-low-text: #475569;
+  --band-novel: #f3e8ff; --band-novel-text: #7e22ce;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #7fa8c9;
+    --band-high: #1e3a5f; --band-high-text: #93c5fd;
+    --band-medium: #422006; --band-medium-text: #fde68a;
+    --band-low: #1e293b; --band-low-text: #94a3b8;
+    --band-novel: #2e1065; --band-novel-text: #d8b4fe;
+  }
+}
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+pre { font-family: ui-monospace, monospace; font-size: 0.8rem; }
+details summary { cursor: pointer; }
+
+/* ── Layout ── */
+.layout { display: grid; grid-template-columns: 190px 1fr; min-height: 100vh; }
+.sidebar {
+  background: #1e293b; color: #94a3b8;
+  padding: 1.5rem 0.75rem; position: sticky; top: 0;
+  height: 100vh; overflow-y: auto; font-size: 0.78rem;
+}
+.sidebar h1 { font-size: 0.85rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.25rem; }
+.sidebar .subtitle { font-size: 0.68rem; opacity: 0.6; margin-bottom: 1.2rem; line-height: 1.4; }
+.sidebar nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.sidebar nav a { color: #64748b; padding: 0.28rem 0.5rem; border-radius: 5px; display: block; line-height: 1.3; }
+.sidebar nav a:hover { background: rgba(255,255,255,0.07); color: #f1f5f9; text-decoration: none; }
+.sidebar .nav-section { font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: #475569; margin: 0.75rem 0 0.2rem 0.5rem; }
+.main { padding: 2rem; max-width: 900px; }
+
+/* ── Header ── */
+.report-header {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.4rem 1.6rem; margin-bottom: 1.5rem;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.report-header h1 { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+.report-header .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+.locked-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--band-novel); color: var(--band-novel-text);
+  padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+}
+.btn-download {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  padding: 0.3rem 0.75rem; border-radius: 6px; font-size: 0.75rem; cursor: pointer;
+  text-decoration: none; font-weight: 600;
+}
+.btn-download:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+/* ── Summary ── */
+.summary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1.2rem 1.4rem; margin-bottom: 1.5rem;
+}
+.summary-card h2 { font-size: 0.82rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.5rem; }
+.summary-card .prose { font-size: 0.92rem; color: var(--text); }
+
+/* ── Analysis section ── */
+.analysis-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem;
+  scroll-margin-top: 1rem;
+}
+.section-header { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.section-header h2 { font-size: 1.05rem; font-weight: 700; color: var(--text); flex: 1; }
+.badges { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.badge { font-size: 0.67rem; font-weight: 700; padding: 0.18rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.badge-method { background: var(--band-low); color: var(--muted); font-family: ui-monospace, monospace; }
+.badge-cluster { background: #e0f2fe; color: #0369a1; }
+.band-high { background: var(--band-high); color: var(--band-high-text); }
+.band-medium { background: var(--band-medium); color: var(--band-medium-text); }
+.band-low { background: var(--band-low); color: var(--band-low-text); }
+.band-novel-candidate { background: var(--band-novel); color: var(--band-novel-text); }
+
+/* ── Figure ── */
+.figure-wrap {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; margin: 0.8rem 0; overflow-x: auto; text-align: center;
+}
+.figure-wrap svg { max-width: 100%; height: auto; }
+
+/* ── Insight / prose from LLM ── */
+.insight {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.9rem 1.1rem; margin: 0.8rem 0;
+}
+.insight-label { font-size: 0.7rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
+.prose p { font-size: 0.88rem; color: var(--text); margin-bottom: 0.4rem; }
+.prose p:last-child { margin-bottom: 0; }
+.prose ul, .prose ol { padding-left: 1.4rem; margin: 0.3rem 0; font-size: 0.88rem; }
+.prose li { margin-bottom: 0.2rem; }
+.prose strong { font-weight: 700; }
+.prose em { font-style: italic; }
+.prose code { font-family: ui-monospace, monospace; font-size: 0.82rem;
+  background: var(--border); padding: 0.1rem 0.3rem; border-radius: 3px; }
+.prose h1, .prose h2, .prose h3 { margin: 0.6rem 0 0.3rem; font-weight: 700; }
+.prose h1 { font-size: 1rem; }
+.prose h2 { font-size: 0.92rem; }
+.prose h3 { font-size: 0.85rem; }
+
+/* ── Metrics ── */
+.metrics { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.6rem 0; }
+.metric {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+  padding: 0.35rem 0.7rem; font-size: 0.75rem; color: var(--muted);
+}
+.metric b { color: var(--text); font-size: 0.82rem; }
+
+/* ── Provenance ── */
+.provenance-details {
+  margin-top: 0.8rem; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.provenance-details summary {
+  padding: 0.45rem 0.8rem; font-size: 0.75rem; font-weight: 600;
+  color: var(--muted); background: var(--bg); list-style: none;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.provenance-details summary::before { content: "▶"; font-size: 0.6rem; transition: transform 0.15s; }
+.provenance-details[open] summary::before { transform: rotate(90deg); }
+.provenance-details pre { padding: 0.75rem; overflow-x: auto; color: var(--text);
+  background: var(--surface); font-size: 0.75rem; line-height: 1.5; }
+
+/* ── Comparison table ── */
+.comparison-section { background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
+.comparison-section h2 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.8rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th { text-align: left; padding: 0.45rem 0.7rem; background: var(--bg);
+  color: var(--muted); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.06em; border-bottom: 2px solid var(--border); }
+td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td:first-child { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar nav ── -->
+  <aside class="sidebar">
+    <h1>BGCLens</h1>
+    <div class="subtitle">{{ project_name }}<br>{{ generated_at }}</div>
+    <nav>
+      <div class="nav-section">Report</div>
+      <a href="#summary">Summary</a>
+      {% if sections %}
+      <div class="nav-section">Analyses ({{ sections | length }})</div>
+      {% for s in sections %}
+      <a href="#{{ s.anchor }}">{{ s.method_id }}{% if s.cluster_id %} · {{ s.cluster_id }}{% endif %}</a>
+      {% endfor %}
+      {% endif %}
+      {% if comparison %}
+      <div class="nav-section">Comparison</div>
+      <a href="#cross-cluster">Cross-cluster</a>
+      {% endif %}
+    </nav>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="report-header">
+      <div>
+        <h1>{{ project_name }}</h1>
+        <div class="meta">
+          Generated {{ generated_at }} ·
+          {{ sections | length }} analysis{% if sections | length != 1 %}es{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+        <a class="btn-download" href="#" onclick="downloadHTML(event)">⬇ Download HTML</a>
+        <span class="locked-badge">🔒 Immutable report</span>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-card" id="summary">
+      <h2>Summary</h2>
+      <div class="prose">
+        {% if summary %}
+          {{ summary | safe }}
+        {% else %}
+          <p>No summary available — run analyses and lock a report to generate one.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Analysis sections -->
+    {% for s in sections %}
+    <section class="analysis-section" id="{{ s.anchor }}">
+      <div class="section-header">
+        <h2>{{ s.method_id | replace("_", " ") | title }}{% if s.cluster_id %} <span style="font-weight:400;color:var(--muted);">· {{ s.cluster_id }}</span>{% endif %}</h2>
+        <div class="badges">
+          <span class="badge badge-method">{{ s.method_id }}</span>
+          {% if s.cluster_id %}<span class="badge badge-cluster">{{ s.cluster_id }}</span>{% endif %}
+          {% if s.confidence_band %}<span class="badge band-{{ s.confidence_band | replace(' ', '-') }}">{{ s.confidence_band }}</span>{% endif %}
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      {% if s.metrics %}
+      <div class="metrics">
+        {% for k, v in s.metrics.items() %}
+        <div class="metric"><b>{{ v }}</b> {{ k | replace("_", " ") }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Figure -->
+      {% if s.svg %}
+      <div class="figure-wrap">
+        {{ s.svg | safe }}
+      </div>
+      {% endif %}
+
+      <!-- Insight (rendered markdown) -->
+      {% if s.interpretation_html %}
+      <div class="insight">
+        <div class="insight-label">Insight</div>
+        <div class="prose">{{ s.interpretation_html | safe }}</div>
+      </div>
+      {% endif %}
+
+      <!-- Provenance -->
+      <details class="provenance-details">
+        <summary>Provenance</summary>
+        <pre>{{ s.provenance_json }}</pre>
+      </details>
+    </section>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:var(--muted);font-size:0.88rem;">
+      No analyses found. Run analyses on the Dashboard first, then lock the report.
+    </div>
+    {% endfor %}
+
+    <!-- Cross-cluster comparison -->
+    {% if comparison %}
+    <section class="comparison-section" id="cross-cluster">
+      <h2>Cross-cluster Comparison</h2>
+      <table>
+        <thead><tr><th>Analysis</th><th>Summary</th></tr></thead>
+        <tbody>
+          {% for key, val in comparison.items() %}
+          <tr><td>{{ key }}</td><td>{{ val }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+  </main>
+</div>
+
+<script>
+function downloadHTML(e) {
+  e.preventDefault();
+  const blob = new Blob([document.documentElement.outerHTML], {type: 'text/html'});
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'bgclens-report.html',
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
