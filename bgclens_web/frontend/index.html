@@ -20,8 +20,8 @@ header h1 { font-size: 1.2rem; font-weight: 700; }
 .app-body { display: grid; grid-template-columns: 220px 1fr 320px; flex: 1; overflow: hidden; gap: 0; }
 
 /* Left KB panel */
-.kb-panel { background: #1a2d4a; color: #c8d6e5; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #0f1f30; }
-.kb-panel h2 { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.75rem 0.9rem 0.4rem; color: #7fa8c9; }
+.kb-panel { background: #1a2d4a; color: #c8d6e5; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #0f1f30; transition: width 0.2s ease; }
+.kb-panel h2 { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.75rem 0.9rem 0.4rem; color: #7fa8c9; white-space: nowrap; }
 .kb-list { overflow-y: auto; flex: 1; padding: 0 0.5rem 0.5rem; }
 .kb-item { padding: 0.35rem 0.5rem; border-radius: 5px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
 .kb-item:hover { background: rgba(255,255,255,0.07); }
@@ -101,12 +101,21 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.87
 .locked-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: #f3e8ff; color: #7e22ce; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
 
 /* Right chat panel */
-.chat-panel { background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
-.chat-panel h2 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.6rem 0.9rem; color: #7fa8c9; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; background: #fafcff; }
+.chat-panel { background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; transition: width 0.2s ease; }
+.chat-panel h2 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.6rem 0.9rem; color: #7fa8c9; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; background: #fafcff; display: flex; align-items: center; white-space: nowrap; }
 .chat-messages { flex: 1; overflow-y: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .msg { max-width: 90%; padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.82rem; line-height: 1.5; }
 .msg-user { background: #2563eb; color: white; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
 .msg-assistant { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-radius: 10px 10px 10px 2px; }
+.msg-assistant h2, .msg-assistant h3, .msg-assistant h4 { font-size: 0.85rem; font-weight: 700; margin: 0.4rem 0 0.2rem; }
+.msg-assistant p { margin-bottom: 0.35rem; }
+.msg-assistant p:last-child { margin-bottom: 0; }
+.msg-assistant ul, .msg-assistant ol { padding-left: 1.2rem; margin: 0.2rem 0 0.35rem; }
+.msg-assistant li { margin-bottom: 0.15rem; font-size: 0.82rem; }
+.msg-assistant strong { font-weight: 700; }
+.msg-assistant em { font-style: italic; }
+.msg-assistant code { font-family: ui-monospace, monospace; font-size: 0.78rem; background: #e2e8f0; padding: 0.1rem 0.25rem; border-radius: 3px; }
+.msg-assistant hr { border: none; border-top: 1px solid #cbd5e1; margin: 0.4rem 0; }
 .chat-input-area { padding: 0.6rem 0.8rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
 .chat-input-row { display: flex; gap: 0.4rem; }
 .chat-input { flex: 1; padding: 0.45rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.82rem; resize: none; height: 2.4rem; }
@@ -121,6 +130,94 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.87
 .hidden { display: none !important; }
 .flex-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 .mono { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #475569; }
+
+/* Panel toggles — fixed position so parent overflow:hidden never clips them */
+.panel-toggle {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 52px; cursor: pointer; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; user-select: none;
+  transition: left 0.2s ease, right 0.2s ease;
+}
+.kb-panel-toggle {
+  left: 220px; background: #1a2d4a; color: #7fa8c9;
+  border: 1px solid #0f1f30; border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+.chat-panel-toggle {
+  right: 320px; background: #f8fafc; color: #7fa8c9;
+  border: 1px solid #e2e8f0; border-right: none;
+  border-radius: 6px 0 0 6px;
+}
+/* Collapsed states */
+.app-body.kb-collapsed { grid-template-columns: 0px 1fr 320px; }
+.app-body.kb-collapsed .kb-panel { min-width: 0; }
+.app-body.kb-collapsed .kb-panel-toggle { left: 0; }
+.app-body.chat-collapsed { grid-template-columns: 220px 1fr 0px; }
+.app-body.chat-collapsed .chat-panel { min-width: 0; }
+.app-body.chat-collapsed .chat-panel-toggle { right: 0; }
+
+/* Sticky run bar */
+.run-bar {
+  position: sticky; bottom: 0; background: white;
+  border-top: 2px solid #e2e8f0; padding: 0.65rem 1.2rem;
+  display: flex; align-items: center; gap: 1rem; flex-shrink: 0;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06); z-index: 5;
+}
+
+/* Source badges for literature card */
+.src-badge { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.src-epmc { background: #dbeafe; color: #1d4ed8; }
+.src-pubmed { background: #dcfce7; color: #15803d; }
+.src-biorxiv { background: #fce7f3; color: #9d174d; }
+.src-badge-sm { font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 999px; }
+.method-extracted { background: #fffbeb; border-color: #fde68a !important; }
+.method-extracted .method-label { color: #92400e; }
+
+/* Horizontal method cards from paper extraction */
+.method-cards-scroll {
+  display: flex; gap: 0.75rem; overflow-x: auto;
+  padding: 0.25rem 0 0.75rem; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.method-cards-scroll::-webkit-scrollbar { height: 5px; }
+.method-cards-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.method-card {
+  flex: 0 0 210px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 0.85rem 0.9rem; background: white; scroll-snap-align: start;
+  display: flex; flex-direction: column; gap: 0.35rem; min-height: 180px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.method-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(37,99,235,0.1); }
+.method-card.card-added { border-color: #2563eb; background: #eff6ff; }
+.method-card-name { font-size: 0.85rem; font-weight: 700; color: #1e293b; line-height: 1.3; }
+.method-card-native { font-size: 0.65rem; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 0.1rem 0.45rem; border-radius: 999px; display: inline-block; width: fit-content; }
+.method-card-intention { font-size: 0.75rem; color: #374151; line-height: 1.4; flex: 1; }
+.method-card-insight { font-size: 0.72rem; color: #64748b; font-style: italic; line-height: 1.35; }
+.method-card-paper { font-size: 0.68rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: auto; padding-top: 0.3rem; border-top: 1px solid #f1f5f9; }
+.btn-add-card { padding: 0.28rem 0.6rem; font-size: 0.75rem; font-weight: 600; border: 1.5px solid #2563eb; border-radius: 6px; color: #2563eb; background: transparent; cursor: pointer; margin-top: 0.4rem; transition: background 0.12s, color 0.12s; }
+.btn-add-card:hover { background: #2563eb; color: white; }
+.card-added .btn-add-card { background: #2563eb; color: white; border-color: #2563eb; }
+
+/* @mention autocomplete popup */
+.mention-popup {
+  position: absolute; bottom: 100%; left: 0; right: 0; z-index: 999; background: white;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.12); max-height: 220px;
+  overflow-y: auto; display: none; flex-direction: column; margin-bottom: 4px;
+}
+.mention-popup.visible { display: flex; }
+.mention-opt {
+  padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer;
+  display: flex; align-items: center; gap: 0.5rem; color: #1e293b;
+}
+.mention-opt:hover, .mention-opt.selected { background: #eff6ff; }
+.mention-opt .mp-type { font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.35rem;
+  border-radius: 3px; flex-shrink: 0; }
+.mp-cluster { background: #1d4ed8; color: white; }
+.mp-method  { background: #15803d; color: white; }
+.mp-report  { background: #7e22ce; color: white; }
+.mention-opt .mp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -181,25 +278,65 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.87
         <div class="method-list" id="method-list">
           <label class="method-row">
             <input type="checkbox" value="alpha_diversity" checked>
-            <span class="method-label">Discovery — Alpha diversity</span>
+            <span class="method-label">Alpha Diversity (Shannon, Simpson)</span>
           </label>
           <label class="method-row">
             <input type="checkbox" value="manufacturability" checked>
-            <span class="method-label">Manufacturability analysis</span>
+            <span class="method-label">Manufacturability Analysis (tractability + chassis hint)</span>
           </label>
           <label class="method-row">
-            <input type="checkbox" value="fisher_exact">
-            <span class="method-label">Enrichment analysis (Fisher's exact)</span>
+            <input type="checkbox" value="fisher_enrichment">
+            <span class="method-label">Enrichment Analysis (Fisher's Exact — BGC class)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="pcoa">
+            <span class="method-label">Principal Coordinates Analysis (PCoA)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="pca">
+            <span class="method-label">Principal Component Analysis (PCA)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="hierarchical_clustering">
+            <span class="method-label">Hierarchical Clustering (Ward / complete linkage)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="permanova">
+            <span class="method-label">PERMANOVA (group comparison of BGC distances)</span>
+          </label>
+          <label class="method-row">
+            <input type="checkbox" value="louvain_community">
+            <span class="method-label">Community Detection (Louvain — GCF network)</span>
           </label>
         </div>
-        <div class="smoke-row" style="margin-top:0.8rem;">
-          <span>Smoke round:</span>
-          <input type="range" id="smoke-n" min="1" max="10" value="3" oninput="document.getElementById('smoke-val').textContent=this.value">
-          <span><b id="smoke-val">3</b> clusters</span>
+      </div>
+
+      <!-- 4b. Paper search -->
+      <div class="card hidden" id="card-literature">
+        <h3>&#128196; Paper Search</h3>
+        <div class="input-row" style="margin-bottom:0.5rem;">
+          <input type="text" id="lit-query" placeholder="e.g. BGC biosynthetic gene cluster Streptomyces"
+            onkeydown="if(event.key==='Enter')searchLiterature()"/>
+          <button class="btn-primary" id="btn-lit" onclick="searchLiterature()">Search</button>
         </div>
-        <div style="margin-top:0.8rem;" class="flex-row">
-          <button class="btn-primary" id="btn-run" onclick="runBatch()" disabled>Run Selected Analyses</button>
-          <span id="run-hint" style="font-size:0.78rem;color:#64748b;"></span>
+        <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;flex-wrap:wrap;align-items:center;">
+          <span class="src-badge src-epmc">EuropePMC</span>
+          <span class="src-badge src-pubmed">PubMed</span>
+          <span class="src-badge src-biorxiv">bioRxiv</span>
+          <span style="font-size:0.7rem;color:#94a3b8;margin-left:auto;">top 8 per source</span>
+        </div>
+        <div id="lit-status" class="hidden" style="font-size:0.8rem;color:#64748b;margin-bottom:0.4rem;"></div>
+        <!-- Scrollable results area — grouped by source -->
+        <div id="lit-results" style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:0.75rem;padding-right:0.25rem;"></div>
+        <div id="lit-extract-bar" class="hidden" style="margin-top:0.7rem;padding-top:0.6rem;border-top:1px solid #f1f5f9;display:flex;align-items:center;gap:0.5rem;">
+          <button class="btn-primary btn-sm" onclick="extractMethods()" id="btn-extract">&#129302; Extract Methods</button>
+          <span id="extract-hint" style="font-size:0.75rem;color:#64748b;"></span>
+        </div>
+        <div id="extracted-methods" class="hidden" style="margin-top:0.6rem;">
+          <div style="font-size:0.8rem;font-weight:600;color:#92400e;margin-bottom:0.35rem;">&#128161; Methods found — scroll to explore, click <b>+ Add</b> to include in analysis:</div>
+          <div class="method-cards-scroll" id="method-cards"></div>
+          <!-- hidden checkboxes kept for runBatch() to collect added card methods -->
+          <div id="extracted-method-list" class="method-list" style="display:none;"></div>
         </div>
       </div>
 
@@ -223,27 +360,82 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 7px; font-size: 0.87
       </div>
     </div>
 
+    <!-- Sticky run bar -->
+    <div class="run-bar hidden" id="run-bar">
+      <div class="smoke-row" style="flex:1;gap:0.7rem;">
+        <span style="white-space:nowrap;font-size:0.82rem;font-weight:600;color:#1e3a5f;">Smoke round:</span>
+        <input type="range" id="smoke-n" min="1" max="10" value="3"
+          oninput="document.getElementById('smoke-val').textContent=this.value" style="flex:1;">
+        <span style="white-space:nowrap;font-size:0.82rem;"><b id="smoke-val">3</b> clusters</span>
+      </div>
+      <button class="btn-primary" id="btn-run" onclick="runBatch()" disabled>&#9654; Run Selected Analyses</button>
+      <span id="run-hint" style="font-size:0.78rem;color:#64748b;"></span>
+    </div>
+
   </div><!-- /centre -->
 
   <!-- Right: persistent chat -->
   <aside class="chat-panel">
-    <h2>Chat</h2>
+    <h2>Chat <span style="margin-left:auto;cursor:pointer;opacity:0.6;font-size:0.85rem;" onclick="toggleChat()" title="Collapse chat">✕</span></h2>
     <div class="chat-messages" id="chat-messages">
       <div class="msg msg-assistant">Hello! Load a project and run analyses, then ask me questions grounded in the results. Use @mention a cluster or method to scope your question.</div>
     </div>
-    <div class="chat-input-area">
+    <div class="chat-input-area" style="position:relative;">
+      <div id="mention-popup" class="mention-popup"></div>
       <div class="chat-input-row">
-        <textarea class="chat-input" id="chat-input" placeholder="Ask a question… @mention a cluster" rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <textarea class="chat-input" id="chat-input" placeholder="Ask anything… type @ to mention a cluster or method" rows="1"
+          oninput="onChatInput(event)"
+          onkeydown="onChatKeydown(event)"></textarea>
         <button class="btn-primary btn-sm" onclick="sendChat()">Send</button>
       </div>
-      <div class="chat-hint">@mention a KB object to scope context · LLM grounded in retrieved data only</div>
+      <div class="chat-hint">Type @ to mention a cluster or method · Ask any biology or analysis question</div>
     </div>
   </aside>
+
+<!-- Fixed panel toggles — outside grid so overflow:hidden never clips them -->
+<div class="panel-toggle kb-panel-toggle" id="kb-toggle-btn" onclick="toggleKB()" title="Toggle KB panel">‹</div>
+<div class="panel-toggle chat-panel-toggle" id="chat-toggle-btn" onclick="toggleChat()" title="Toggle chat">›</div>
 
 </div><!-- /app-body -->
 
 <script>
+// ── Minimal markdown renderer ─────────────────────────────────────────────────
+function renderMarkdown(text) {
+  if (!text) return '';
+  let s = text
+    // Fix literal \n sequences from LLM
+    .replace(/\\n/g, '\n')
+    // Escape HTML entities first
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Headers
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    // Bold + italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Bullet lists — collect consecutive lines
+    .replace(/((?:^[-*] .+\n?)+)/gm, m => '<ul>' + m.replace(/^[-*] (.+)$/gm, '<li>$1</li>') + '</ul>')
+    // Numbered lists
+    .replace(/((?:^\d+\. .+\n?)+)/gm, m => '<ol>' + m.replace(/^\d+\. (.+)$/gm, '<li>$1</li>') + '</ol>')
+    // Horizontal rule
+    .replace(/^---+$/gm, '<hr>')
+    // Paragraphs: double newlines → <p>
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => {
+      if (p.startsWith('<h') || p.startsWith('<ul') || p.startsWith('<ol') || p.startsWith('<hr')) return p;
+      // Single newlines within a paragraph → <br>
+      return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+    })
+    .join('\n');
+  return s;
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 const state = {
   projectPath: null,
@@ -294,7 +486,9 @@ async function loadProject() {
     document.getElementById('card-embed').classList.remove('hidden');
     document.getElementById('card-clusters').classList.remove('hidden');
     document.getElementById('card-analyses').classList.remove('hidden');
+    document.getElementById('card-literature').classList.remove('hidden');
     document.getElementById('btn-run').disabled = false;
+    document.getElementById('run-bar').classList.remove('hidden');
   } catch(e) {
     statusEl.className = 'alert alert-error';
     statusEl.textContent = '✖ ' + e.message;
@@ -382,7 +576,22 @@ function insertMention(id) {
 // ── Run batch ─────────────────────────────────────────────────────────────────
 async function runBatch() {
   if (!state.projectPath) return;
-  const checked = [...document.querySelectorAll('#method-list input[type=checkbox]:checked')];
+
+  // Collect from native method list + extracted method list (hidden checkboxes synced by toggleMethodCard)
+  const checked = [
+    ...document.querySelectorAll('#method-list input[type=checkbox]:checked'),
+    ...document.querySelectorAll('#extracted-method-list input[type=checkbox]:checked'),
+  ];
+  // Also treat added cards that have a bgclens_id as checked
+  document.querySelectorAll('.method-card.card-added').forEach(card => {
+    const mid = card.dataset.methodId;
+    if (mid && !checked.some(cb => cb.value === mid)) {
+      const el = document.createElement('input');
+      el.value = mid;
+      checked.push(el);
+    }
+  });
+
   if (!checked.length) { alert('Select at least one analysis method.'); return; }
 
   const methodIds = checked.map(el => el.value);
@@ -480,19 +689,22 @@ async function renderLockReport(event) {
     document.getElementById('report-status').classList.add('hidden');
 
     let html = '';
+    let downloadBtn = '';
     if (data.html_b64) {
-      const blob = new Blob([atob(data.html_b64)], {type:'text/html'});
-      const url = URL.createObjectURL(blob);
-      html = `<iframe class="report-iframe" src="${url}"></iframe>`;
+      const htmlBytes = atob(data.html_b64);
+      const blob = new Blob([htmlBytes], {type:'text/html'});
+      const blobUrl = URL.createObjectURL(blob);
+      html = `<iframe class="report-iframe" src="${blobUrl}"></iframe>`;
+      downloadBtn = `<a href="${blobUrl}" download="bgclens-report.html" class="btn-primary btn-sm">⬇ Download HTML</a>`;
     } else {
-      html = `<div class="alert alert-info">Report QMD written: <span class="mono">${data.qmd_path || data.locked_path}</span><br>Quarto not installed — download the .qmd to render locally.</div>`;
+      html = `<div class="alert alert-info">Report generated but HTML not available.</div>`;
     }
 
     const lockedInfo = data.locked_path ? `<div class="locked-badge">🔒 Immutable: ${data.locked_path.split('/').pop()}</div>` : '';
     content.innerHTML = html + lockedInfo;
 
     document.getElementById('report-actions').innerHTML = `
-      ${data.locked_path ? `<a href="/api/report/download?path=${encodeURIComponent(data.locked_path)}" class="btn-primary btn-sm">Download .qmd</a>` : ''}
+      ${downloadBtn}
       <button class="btn-lock btn-sm" onclick="wrapRoCrate()">Wrap RO-Crate</button>
     `;
   } catch(e) {
@@ -518,6 +730,95 @@ async function wrapRoCrate() {
   }
 }
 
+// ── @mention autocomplete ─────────────────────────────────────────────────────
+const _mentionState = { open: false, query: '', atPos: -1, idx: 0 };
+
+function _mentionItems(query) {
+  const q = query.toLowerCase();
+  return state.kbObjects
+    .filter(o => !q || o.id.toLowerCase().includes(q) || (o.label||'').toLowerCase().includes(q))
+    .slice(0, 12);
+}
+
+function _renderMentionPopup(items) {
+  const popup = document.getElementById('mention-popup');
+  if (!items.length) { _closeMentionPopup(); return; }
+  popup.innerHTML = items.map((o, i) => {
+    const typeClass = o.type === 'cluster' ? 'mp-cluster' : o.type === 'method' ? 'mp-method' : 'mp-report';
+    return `<div class="mention-opt${i === _mentionState.idx ? ' selected' : ''}" data-id="${o.id}" onclick="_pickMention('${o.id}')">
+      <span class="mp-type ${typeClass}">${o.type}</span>
+      <span class="mp-label">${o.id}</span>
+    </div>`;
+  }).join('');
+
+  popup.classList.add('visible');
+  _mentionState.open = true;
+}
+
+function _closeMentionPopup() {
+  document.getElementById('mention-popup').classList.remove('visible');
+  _mentionState.open = false;
+  _mentionState.atPos = -1;
+}
+
+function _pickMention(id) {
+  const inp = document.getElementById('chat-input');
+  const val = inp.value;
+  const before = val.slice(0, _mentionState.atPos);
+  const after = val.slice(_mentionState.atPos + 1 + _mentionState.query.length);
+  inp.value = before + '@' + id + ' ' + after;
+  inp.focus();
+  const pos = before.length + id.length + 2;
+  inp.setSelectionRange(pos, pos);
+  _closeMentionPopup();
+}
+
+function onChatInput(e) {
+  const inp = e.target;
+  const val = inp.value;
+  const caret = inp.selectionStart;
+
+  // Find last @ before caret
+  const textBeforeCaret = val.slice(0, caret);
+  const atIdx = textBeforeCaret.lastIndexOf('@');
+  if (atIdx !== -1) {
+    const fragment = textBeforeCaret.slice(atIdx + 1);
+    // Only trigger if no space in fragment (we're still typing the mention)
+    if (!fragment.includes(' ')) {
+      _mentionState.atPos = atIdx;
+      _mentionState.query = fragment;
+      _mentionState.idx = 0;
+      const items = _mentionItems(fragment);
+      if (items.length) { _renderMentionPopup(items); return; }
+    }
+  }
+  _closeMentionPopup();
+}
+
+function onChatKeydown(e) {
+  if (_mentionState.open) {
+    const items = _mentionItems(_mentionState.query);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _mentionState.idx = Math.min(_mentionState.idx + 1, items.length - 1);
+      _renderMentionPopup(items); return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _mentionState.idx = Math.max(_mentionState.idx - 1, 0);
+      _renderMentionPopup(items); return;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (items[_mentionState.idx]) {
+        e.preventDefault();
+        _pickMention(items[_mentionState.idx].id); return;
+      }
+    }
+    if (e.key === 'Escape') { _closeMentionPopup(); return; }
+  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 async function sendChat() {
   const inp = document.getElementById('chat-input');
@@ -527,6 +828,7 @@ async function sendChat() {
     return;
   }
   inp.value = '';
+  _closeMentionPopup();
 
   appendMsg('user', msg);
   state.chatHistory.push({role: 'user', content: msg});
@@ -546,7 +848,7 @@ async function sendChat() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Chat failed');
     const reply = data.reply || 'No response.';
-    placeholder.textContent = reply;
+    placeholder.innerHTML = renderMarkdown(reply);
     state.chatHistory.push({role: 'assistant', content: reply});
   } catch(e) {
     placeholder.textContent = '✖ ' + e.message;
@@ -557,11 +859,236 @@ function appendMsg(role, content) {
   const msgs = document.getElementById('chat-messages');
   const el = document.createElement('div');
   el.className = 'msg msg-' + role;
-  el.textContent = content;
+  if (role === 'assistant') {
+    el.innerHTML = renderMarkdown(content);
+  } else {
+    el.textContent = content;
+  }
   msgs.appendChild(el);
   msgs.scrollTop = msgs.scrollHeight;
   return el;
 }
+
+// ── KB sidebar toggle ─────────────────────────────────────────────────────────
+function toggleKB() {
+  const body = document.querySelector('.app-body');
+  body.classList.toggle('kb-collapsed');
+  document.getElementById('kb-toggle-btn').textContent = body.classList.contains('kb-collapsed') ? '›' : '‹';
+}
+function toggleChat() {
+  const body = document.querySelector('.app-body');
+  body.classList.toggle('chat-collapsed');
+  document.getElementById('chat-toggle-btn').textContent = body.classList.contains('chat-collapsed') ? '‹' : '›';
+}
+
+// ── Literature / paper search ─────────────────────────────────────────────────
+let litPapers = [];  // store for extract-methods
+
+function _renderPaper(r, idx) {
+  const authors = (r.authors || []).slice(0, 3).join(', ') + ((r.authors?.length > 3) ? ' et al.' : '');
+  const link = r.url ? `<a href="${r.url}" target="_blank" style="color:#2563eb;font-size:0.75rem;text-decoration:none;">↗</a>` : '';
+  const srcClass = r.source === 'pubmed' ? 'src-pubmed' : r.source === 'biorxiv' ? 'src-biorxiv' : 'src-epmc';
+  const srcLabel = r.source === 'pubmed' ? 'PubMed' : r.source === 'biorxiv' ? 'bioRxiv' : 'EuropePMC';
+  return `<label style="border:1px solid #e2e8f0;border-radius:7px;padding:0.5rem 0.7rem;background:white;display:flex;gap:0.5rem;cursor:pointer;transition:border-color 0.12s;"
+    onmouseenter="this.style.borderColor='#93c5fd'" onmouseleave="this.style.borderColor='#e2e8f0'">
+    <input type="checkbox" class="paper-select" data-idx="${idx}"
+      style="margin-top:0.2rem;flex-shrink:0;width:1rem;height:1rem;cursor:pointer;"
+      onchange="updateExtractBar()">
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:flex-start;gap:0.4rem;margin-bottom:0.15rem;">
+        <span class="src-badge-sm ${srcClass}" style="flex-shrink:0;margin-top:0.1rem;">${srcLabel}</span>
+        <span style="font-size:0.82rem;font-weight:600;color:#1e293b;flex:1;line-height:1.3;">${r.title || '(no title)'}</span>
+        ${link}
+      </div>
+      <div style="font-size:0.72rem;color:#64748b;">${authors}${r.year ? ' · ' + r.year : ''}</div>
+      ${r.abstract ? `<div style="font-size:0.74rem;color:#374151;margin-top:0.2rem;line-height:1.4;">${r.abstract}</div>` : ''}
+    </div>
+  </label>`;
+}
+
+function updateExtractBar() {
+  const checked = document.querySelectorAll('.paper-select:checked');
+  const bar = document.getElementById('lit-extract-bar');
+  const btn = document.getElementById('btn-extract');
+  if (bar) bar.classList.toggle('hidden', checked.length === 0);
+  if (btn) btn.textContent = `🤖 Extract Methods from ${checked.length} Paper${checked.length !== 1 ? 's' : ''}`;
+}
+
+async function searchLiterature() {
+  const query = document.getElementById('lit-query').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('btn-lit');
+  const statusEl = document.getElementById('lit-status');
+  const resultsEl = document.getElementById('lit-results');
+  const extractBar = document.getElementById('lit-extract-bar');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = 'Searching EuropePMC, PubMed, and bioRxiv…';
+  statusEl.classList.remove('hidden');
+  resultsEl.innerHTML = '';
+  extractBar.classList.add('hidden');
+  document.getElementById('extracted-methods').classList.add('hidden');
+  litPapers = [];
+
+  try {
+    const res = await fetch('/api/literature', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, max_results: 24}),  // 8 per source × 3
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Search failed');
+
+    litPapers = data.results || [];
+    const total = data.total || litPapers.length;
+    statusEl.textContent = `${total} result${total !== 1 ? 's' : ''} across ${(data.sources_searched || []).length} sources`;
+
+    if (!litPapers.length) {
+      resultsEl.innerHTML = '<div style="font-size:0.8rem;color:#64748b;padding:0.5rem;">No results found.</div>';
+      return;
+    }
+
+    // Group by source — 8 per source displayed
+    const sourceOrder = ['europepmc', 'pubmed', 'biorxiv'];
+    const sourceLabel = {europepmc: 'EuropePMC', pubmed: 'PubMed / NCBI', biorxiv: 'bioRxiv preprints'};
+    const sourceCls   = {europepmc: 'src-epmc',  pubmed: 'src-pubmed',    biorxiv: 'src-biorxiv'};
+    const grouped = {};
+    for (const r of litPapers) { (grouped[r.source] = grouped[r.source] || []).push(r); }
+
+    let html = '';
+    let globalIdx = 0;
+    for (const src of sourceOrder) {
+      const papers = (grouped[src] || []).slice(0, 8);
+      if (!papers.length) continue;
+      html += `<div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
+          <span class="src-badge ${sourceCls[src]}">${sourceLabel[src]}</span>
+          <span style="font-size:0.7rem;color:#94a3b8;">${papers.length} result${papers.length!==1?'s':''}</span>
+          <span style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">☑ check to include in extraction</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.35rem;">
+          ${papers.map((r) => _renderPaper(r, globalIdx++)).join('')}
+        </div>
+      </div>`;
+    }
+    resultsEl.innerHTML = html;
+    updateExtractBar();
+  } catch(e) {
+    statusEl.textContent = '✖ ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+function toggleMethodCard(btn) {
+  const card = btn.closest('.method-card');
+  card.classList.toggle('card-added');
+  const added = card.classList.contains('card-added');
+  btn.textContent = added ? '✓ Added' : '+ Add to Analysis';
+
+  // Sync a hidden checkbox so runBatch() can find it
+  const methodId = card.dataset.methodId;
+  const methodName = card.dataset.methodName;
+  if (methodId) {
+    const list = document.getElementById('extracted-method-list');
+    let existing = list.querySelector(`input[value="${CSS.escape(methodId)}"]`);
+    if (!existing) {
+      const lbl = document.createElement('label');
+      lbl.className = 'method-row method-extracted';
+      lbl.innerHTML = `<input type="checkbox" value="${methodId}"><span class="method-label">${methodName}</span>`;
+      list.appendChild(lbl);
+      existing = lbl.querySelector('input');
+    }
+    existing.checked = added;
+    // Sync native method checkbox if it already exists in the main list
+    const nativeEl = document.querySelector(`#method-list input[value="${CSS.escape(methodId)}"]`);
+    if (nativeEl) nativeEl.checked = added;
+  }
+}
+
+async function extractMethods() {
+  const checkedBoxes = [...document.querySelectorAll('.paper-select:checked')];
+  if (!checkedBoxes.length) return;
+  const btn = document.getElementById('btn-extract');
+  const hint = document.getElementById('extract-hint');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Extracting…';
+  hint.textContent = '';
+
+  // Collect full paper objects by index
+  const selected = checkedBoxes
+    .map(cb => litPapers[parseInt(cb.dataset.idx)])
+    .filter(Boolean);
+
+  try {
+    const res = await fetch('/api/literature/extract-methods', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        papers: selected.map(p => ({
+          title: p.title || '',
+          abstract: p.abstract || '',
+          doi: p.doi || '',
+          pmid: p.pmid || '',
+          url: p.url || '',
+          source: p.source || '',
+        })),
+        abstracts: selected.map(p => p.abstract || p.title || ''),
+        titles: selected.map(p => p.title || ''),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Extraction failed');
+
+    const methods = data.methods || [];
+    if (!methods.length) {
+      hint.textContent = 'No methods detected — try selecting papers with richer abstracts.';
+      return;
+    }
+
+    const cardsContainer = document.getElementById('method-cards');
+    cardsContainer.innerHTML = '';
+    document.getElementById('extracted-method-list').innerHTML = '';
+
+    for (const m of methods) {
+      const name = m.method_name || 'Unknown Method';
+      const bgclensId = m.bgclens_id || '';
+      const nativeBadge = bgclensId
+        ? `<span class="method-card-native">BGCLens native</span>` : '';
+      const intention = m.intention || '';
+      const insight = m.insight || '';
+      const paperTitle = m.paper_title || '';
+
+      const card = document.createElement('div');
+      card.className = 'method-card';
+      card.dataset.methodId = bgclensId;
+      card.dataset.methodName = name;
+      card.innerHTML = `
+        <div class="method-card-name">${name}</div>
+        ${nativeBadge}
+        <div class="method-card-intention">${intention}</div>
+        <div class="method-card-insight">${insight}</div>
+        <div class="method-card-paper" title="${paperTitle}">${paperTitle}</div>
+        <button class="btn-add-card" onclick="toggleMethodCard(this)">+ Add to Analysis</button>`;
+      cardsContainer.appendChild(card);
+    }
+
+    document.getElementById('extracted-methods').classList.remove('hidden');
+    hint.textContent = `${methods.length} method${methods.length !== 1 ? 's' : ''} found across ${selected.length} paper${selected.length !== 1 ? 's' : ''}.`;
+  } catch(e) {
+    hint.textContent = '✖ ' + e.message;
+  } finally {
+    btn.disabled = false;
+    updateExtractBar();
+  }
+}
+
+// Close mention popup when clicking outside the chat area
+document.addEventListener('click', e => {
+  if (!e.target.closest('.chat-input-area') && !e.target.closest('#mention-popup')) {
+    _closeMentionPopup();
+  }
+});
 </script>
 </body>
 </html>
