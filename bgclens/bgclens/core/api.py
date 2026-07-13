@@ -199,8 +199,31 @@ def recommend(
     return validation, recommendations
 
 
+def _run_manufacturability(project: "Project", params: dict | None) -> dict[str, Any]:
+    """Execute the manufacturability analysis (not a catalog method)."""
+    from bgclens.manufacturability import compute_features, compute_profile
+    features = compute_features(project)
+    profile = compute_profile(features, project.taxonomy)
+    band = "high" if profile.tractability_score >= 0.65 else ("medium" if profile.tractability_score >= 0.35 else "low")
+    return {
+        "tractability_score": round(profile.tractability_score, 3),
+        "top_class": profile.top_class,
+        "n_bgcs": profile.n_bgcs,
+        "chassis_hint": profile.chassis_hint,
+        "blockers": profile.blockers,
+        "notes": profile.notes,
+        "_method_id": "manufacturability",
+        "_assumption_warnings": [],
+        "_confidence_band": band,
+        "_validation_checks": [],
+    }
+
+
 def run(project: "Project", method_id: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute a method and return the structured result with provenance."""
+    if method_id == "manufacturability":
+        return _run_manufacturability(project, params)
+
     from bgclens.catalog.registry import get_impl, get_method
     from bgclens.core.provenance import RunRecord, hash_project
 
