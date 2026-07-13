@@ -82,27 +82,21 @@ def build_messages(
 
 
 def call_chat(client, model: str, messages: list[dict[str, str]]) -> str:
-    """Perform one chat completion against the configured endpoint; return raw text."""
+    """Perform one chat completion against the configured endpoint; return raw text.
+
+    When the model is a reasoning/thinking model (e.g. DeepSeek R-series) it puts
+    its chain-of-thought in reasoning_content and leaves content empty when token
+    budget runs out.  For structured report text we must NOT use reasoning_content
+    — it contains raw internal monologue that would leak into the report.  Return ""
+    so the caller falls back to the deterministic template_text.
+    """
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=0.3,
         max_tokens=1400,
     )
-    msg = response.choices[0].message
-    content = (msg.content or "").strip()
-    if not content:
-        # Reasoning model fallback: extract from reasoning_content
-        rc = (getattr(msg, "reasoning_content", None) or "").strip()
-        if rc:
-            for marker in ("## Method", "## Result", "**The analysis", "In summary,"):
-                idx = rc.find(marker)
-                if idx != -1:
-                    content = rc[idx:].strip()
-                    break
-            else:
-                content = rc[-1200:].strip()
-    return content
+    return (response.choices[0].message.content or "").strip()
 
 
 _PREAMBLE_LEAD_RE = re.compile(

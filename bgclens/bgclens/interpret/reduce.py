@@ -103,14 +103,9 @@ def reduce_summary(records: list) -> str:
                 temperature=0.3,
                 max_tokens=600,
             )
-            msg = response.choices[0].message
-            raw = (msg.content or "").strip()
-            # Reasoning model fallback
-            if not raw:
-                rc = (getattr(msg, "reasoning_content", None) or "").strip()
-                if rc:
-                    raw = rc[-600:].strip()
-
+            # Do NOT fall back to reasoning_content — it leaks internal
+            # chain-of-thought monologue into the report.
+            raw = (response.choices[0].message.content or "").strip()
             if not raw:
                 return fallback
 

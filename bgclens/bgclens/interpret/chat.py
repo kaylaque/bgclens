@@ -18,6 +18,44 @@ logger = logging.getLogger(__name__)
 _MAX_HISTORY  = 8     # turns kept in context window
 _MAX_CTX_CHARS = 6000 # cap on assembled retrieval context
 
+# Phrases that indicate we are still inside the thinking preamble, not the answer.
+_THINKING_PREAMBLE = (
+    "let me think", "let me consider", "okay, so", "okay so", "alright,",
+    "i need to", "i should", "the user", "the question", "thinking.",
+    "first, let", "let's think", "let me analyze", "let me re-read",
+)
+
+
+def _extract_answer_from_reasoning(rc: str) -> str:
+    """Pull the actual answer out of a reasoning model's chain-of-thought.
+
+    Strategy: find the last substantive paragraph that does NOT read like
+    internal deliberation, and return that as the answer.  Falls back to
+    the last 600 characters if no clean boundary is found.
+    """
+    import re
+
+    # Explicit answer markers the model sometimes writes
+    for marker in ("**Answer:**", "**Final Answer:**", "**Response:**",
+                   "In summary,", "In conclusion,", "Therefore,", "To answer"):
+        idx = rc.rfind(marker)
+        if idx != -1:
+            candidate = rc[idx:].strip()
+            if len(candidate) > 40:
+                return candidate
+
+    # Walk paragraphs from the end, skip obvious thinking preamble
+    paras = [p.strip() for p in re.split(r'\n{2,}', rc) if p.strip()]
+    for para in reversed(paras):
+        low = para.lower()
+        if any(low.startswith(p) for p in _THINKING_PREAMBLE):
+            continue
+        if len(para) > 60:
+            return para
+
+    # Last resort: last 600 chars
+    return rc[-600:].strip()
+
 # ── Method knowledge base ────────────────────────────────────────────────────
 _METHOD_KB: dict[str, str] = {
     "alpha_diversity": (
@@ -306,21 +344,16 @@ def chat(
             )
             msg = response.choices[0].message
             content = (msg.content or "").strip()
-            # Reasoning models (DeepSeek R-series) put final answer in content,
-            # but if max_tokens ran out during chain-of-thought content is empty.
-            # Fall back to reasoning_content which has the full thought + answer.
+
+            # Reasoning model (DeepSeek R-series etc.) puts chain-of-thought in
+            # reasoning_content and leaves content empty when token budget runs out
+            # during thinking.  For chat we attempt one extraction: find the first
+            # sentence that reads like a direct answer (not "Let me think…" preamble).
             if not content:
-                content = (getattr(msg, "reasoning_content", None) or "").strip()
-                # Extract the final paragraph/answer after "**Answer:**" or last block
-                if content:
-                    for marker in ("**Answer:**", "**Final Answer:**", "In summary,", "Therefore,"):
-                        idx = content.rfind(marker)
-                        if idx != -1:
-                            content = content[idx:].strip()
-                            break
-                    else:
-                        # Take the last 800 chars of reasoning as the answer
-                        content = content[-800:].strip()
+                rc = (getattr(msg, "reasoning_content", None) or "").strip()
+                if rc:
+                    content = _extract_answer_from_reasoning(rc)
+
             reply = content or fallback
 
         except Exception as exc:
